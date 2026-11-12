@@ -425,8 +425,16 @@ export default function Navigate() {
             <VehiclePuck icon={mode === 'taxi' ? 'taxi' : 'bus'} bg={mode === 'taxi' ? C.navy : C.route} />
           </Marker>
         ) : (
-          <Marker key="me" coordinate={pos} anchor={{ x: 0.5, y: 0.55 }} flat={false} tracksViewChanges={false} zIndex={45}>
-            <MeArrow size={54} heading={Platform.OS === 'web' || !follow ? heading : 0} />
+          <Marker
+            key="me"
+            coordinate={pos}
+            anchor={{ x: 0.5, y: 0.55 }}
+            flat={false}
+            rotation={Platform.OS !== 'web' && (!follow || phase !== 'go') ? Math.round(heading) : 0}
+            tracksViewChanges={false}
+            zIndex={45}
+          >
+            <MeArrow size={54} heading={Platform.OS === 'web' ? heading : 0} />
           </Marker>
         )}
       </MapView>

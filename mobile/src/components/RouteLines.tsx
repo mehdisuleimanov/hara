@@ -6,39 +6,22 @@ import type { RouteOption } from '@/data/types';
 import { toLatLngs } from '@/utils/geo';
 import { C } from '@/theme';
 import { Icon, Txt } from './ui';
+import { LegPolyline } from '@/features/map/LegPolyline';
 
-const LEG_COLOR: Record<string, string> = {
-  walk: C.route,
-  metro: C.metro,
-  bus: C.bus,
-  taxi: '#5B6478',
-  scooter: C.route,
-  bike: C.route,
-};
-
+/** Whole route, per-leg styling (metro legs underground). Thin wrapper over LegPolyline. */
 export const RouteLines = memo(function RouteLines({ option, active }: { option: RouteOption; active: boolean }) {
   return (
     <>
-      {option.legs.map((leg, i) => {
-        const coords = toLatLngs(leg.c);
-        if (!active) {
-          return <Polyline key={i} coordinates={coords} strokeColor="#9AA1B2" strokeWidth={4} lineDashPattern={[8, 8]} zIndex={6} />;
-        }
-        return (
+      {option.legs.map((leg, i) =>
+        active ? (
           <React.Fragment key={i}>
-            <Polyline coordinates={coords} strokeColor={C.halo} strokeWidth={16} zIndex={7} lineCap="round" />
-            <Polyline
-              coordinates={coords}
-              strokeColor={LEG_COLOR[leg.mode]}
-              strokeWidth={6}
-              lineCap="round"
-              lineJoin="round"
-              lineDashPattern={leg.mode === 'metro' ? [2, 10] : undefined}
-              zIndex={8}
-            />
+            {leg.mode !== 'metro' ? <Polyline coordinates={toLatLngs(leg.c)} strokeColor={C.routeGlow} strokeWidth={20} lineCap="round" zIndex={4} /> : null}
+            <LegPolyline leg={leg} state="active" zIndex={6} />
           </React.Fragment>
-        );
-      })}
+        ) : (
+          <LegPolyline key={i} leg={leg} state="inactive" zIndex={2} />
+        ),
+      )}
     </>
   );
 });
