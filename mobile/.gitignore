@@ -43,5 +43,3 @@ yarn-error.*
 # local env (Gemini key)
 .env
 .env*.local
-# raw OSM downloads
-scripts/.cache/
