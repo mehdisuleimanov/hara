@@ -12,7 +12,7 @@ export const LEG_COLOR: Record<string, string> = {
   walk: C.route,
   metro: C.underground,
   bus: C.route,
-  taxi: '#2E3A52',
+  taxi: '#1D4FC4',
   scooter: C.brand,
   bike: C.brand,
 };
@@ -105,7 +105,7 @@ export const LegPolyline = memo(function LegPolyline({
   return (
     <>
       <Polyline coordinates={coords} strokeColor={dark ? 'rgba(255,255,255,0.9)' : '#FFFFFF'} strokeWidth={12} lineCap="round" lineJoin="round" zIndex={zIndex} />
-      <Polyline coordinates={coords} strokeColor={LEG_COLOR[leg.mode] ?? C.route} strokeWidth={7} lineCap="round" lineJoin="round" zIndex={zIndex + 1} />
+      <Polyline coordinates={coords} strokeColor={dark && leg.mode === 'taxi' ? '#6EA0FF' : LEG_COLOR[leg.mode] ?? C.route} strokeWidth={7} lineCap="round" lineJoin="round" zIndex={zIndex + 1} />
     </>
   );
 });

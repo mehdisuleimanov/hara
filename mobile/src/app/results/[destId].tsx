@@ -223,11 +223,12 @@ function ResultsView({
     (s: Snap) => {
       if (!fitPts.length || s === 'full' || lmRef.current) return;
       const extra = s === 'mid' ? midVis - peekVis : 0;
-      mapRef.current?.fitToCoordinates(fitPts, { edgePadding: { top: 40, right: 30, bottom: extra + 40, left: 30 }, animated: true });
+      mapRef.current?.fitToCoordinates(fitPts, { edgePadding: { top: 70, right: 40, bottom: extra + 84, left: 40 }, animated: true });
     },
     [fitPts, midVis, peekVis],
   );
   const firstFit = useRef(true);
+  const userMoved = useRef(false);
   useEffect(() => {
     if (firstFit.current) {
       firstFit.current = false;
@@ -384,8 +385,15 @@ function ResultsView({
         customMapStyle={look.customMapStyle}
         initialRegion={initialRegion}
         onMapReady={() => {
+          // the map may report ready before its first layout pass -> fit again once it has a size
           fitRoute(snapRef.current);
-          setTimeout(overlay.refresh, 700);
+          setTimeout(() => {
+            if (!userMoved.current) fitRoute(snapRef.current);
+          }, 450);
+          setTimeout(overlay.refresh, 1100);
+        }}
+        onPanDrag={() => {
+          userMoved.current = true;
         }}
         onRegionChange={overlay.onRegionChange}
         onRegionChangeComplete={overlay.onRegionChangeComplete}
