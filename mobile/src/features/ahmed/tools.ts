@@ -360,7 +360,7 @@ export function stepOutcome(name: string, r: Json): Pick<AhmedStep, 'value' | 's
       return { value: 'düzgün tərəf', state: 'done' };
     }
     case 'route_to_place': {
-      if (!r.found) return { value: 'tanımadım', state: 'warn' };
+      if (!r.found) return { value: 'hələ tanımıram', state: 'warn' };
       return { value: String(r.place), state: 'done' };
     }
   }

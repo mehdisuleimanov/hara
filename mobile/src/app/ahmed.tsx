@@ -512,7 +512,7 @@ export default function AhmedScreen() {
                     <HandoffCard title={routeCard.title} sub={routeCard.sub} ms={handoffMs ?? 7000} onOpen={() => openRoute(result)} />
                   ) : null}
                   {followUps.length ? <ChipRow items={followUps} base={200} /> : null}
-                  {result.intent === 'unclear' ? <ChipRow items={suggestions.slice(0, 3)} base={200} /> : null}
+                  {result.intent === 'unclear' || (result.intent === 'route' && !routeCard) ? <ChipRow items={suggestions.slice(0, 3)} base={200} /> : null}
                 </>
               ) : null}
             </View>
