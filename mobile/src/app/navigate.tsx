@@ -569,9 +569,10 @@ export default function Navigate() {
             <View style={{ flex: 1 }}>
               <Txt w="black" size={15.5} color="#7A4A00">
                 {Math.max(10, Math.round((hazard.atM - dist) / 10) * 10)} m irəlidə {hazard.kind === 'unmarked' ? 'nişansız keçid' : 'işıqforsuz keçid'}
+                {hazard.lanes ? ` · ${hazard.lanes} zolaq` : ''}
               </Txt>
               <Txt w="semi" size={13} color="#8A5A00" style={{ marginTop: 2 }}>
-                Səni işıqforlu keçidə yönləndirirəm{hazard.lanes ? ` · ${hazard.lanes} zolaq` : ''}
+                Əhməd: səni işıqforlu keçidə yönləndirirəm
               </Txt>
             </View>
             <Icon name="traffic-light" size={26} color={C.brandDark} />
