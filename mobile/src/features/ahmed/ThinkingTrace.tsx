@@ -24,7 +24,7 @@ import { C, R } from '@/theme';
  * Əhməd's live reasoning: one row per real step (understanding + every tool call).
  * spinner → spring check / amber warn / red fail; value slides in when it arrives.
  */
-export function ThinkingTrace({ steps, done }: { steps: AhmedStep[]; done?: boolean }) {
+export function ThinkingTrace({ steps, done, composing }: { steps: AhmedStep[]; done?: boolean; composing?: string | null }) {
   const t = useTheme();
   if (!steps.length) return null;
   return (
@@ -38,6 +38,11 @@ export function ThinkingTrace({ steps, done }: { steps: AhmedStep[]; done?: bool
       {steps.map((s, i) => (
         <Row key={s.id} step={s} last={i === steps.length - 1} />
       ))}
+      {composing ? (
+        <Animated.View entering={FadeIn.duration(260)} style={styles.composing}>
+          <PulseLabel text={composing} pulsing />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -139,5 +144,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
   rail: { width: 26, alignItems: 'center' },
   icon: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  composing: { marginTop: 12, paddingLeft: 38 },
   line: { flex: 1, width: 2, borderRadius: 1, backgroundColor: C.line, marginTop: 4 },
 });

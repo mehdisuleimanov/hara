@@ -491,7 +491,19 @@ export default function AhmedScreen() {
                 </Animated.View>
               ) : null}
 
-              <ThinkingTrace steps={steps} done={phase === 'answer'} />
+              <ThinkingTrace
+                steps={steps}
+                done={phase === 'answer'}
+                composing={
+                  phase !== 'thinking' || !steps.length || steps.some((s) => s.state === 'run')
+                    ? null
+                    : steps.length === 1
+                      ? steps[0].state === 'done'
+                        ? 'Nəyi yoxlayacağımı seçirəm…'
+                        : null
+                      : 'Cavabı hazırlayıram…'
+                }
+              />
 
               {phase === 'answer' && result ? (
                 <>
