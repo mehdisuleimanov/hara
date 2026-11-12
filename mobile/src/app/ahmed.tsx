@@ -71,6 +71,7 @@ export default function AhmedScreen() {
   const [result, setResult] = useState<AhmedResult | null>(null);
   const [handoffMs, setHandoffMs] = useState<number | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState<number | null>(null);
 
   const busy = useRef(false);
   const runId = useRef(0);
@@ -205,6 +206,7 @@ export default function AhmedScreen() {
     setHandoffMs(null);
     setHint(null);
     setResult(null);
+    setElapsed(null);
     useAhmedSession.getState().resetSteps();
     const typedText = payload.text && !opts.asVoice ? payload.text : '';
     transcriptRef.current = typedText;
@@ -233,6 +235,7 @@ export default function AhmedScreen() {
     }
     // stage safety: a failed recording runs the prepared sentence (only when enabled in the hidden panel)
     if (my !== runId.current) return;
+    setElapsed(Date.now() - started);
     if (payload.audioB64 && r.intent === 'unclear' && r.error && usePrefs.getState().stageFallback) {
       busy.current = false;
       return run({ text: DEMO_SENTENCE }, { asVoice: true });
@@ -538,6 +541,7 @@ export default function AhmedScreen() {
               <ThinkingTrace
                 steps={steps}
                 done={phase === 'answer'}
+                elapsedMs={elapsed}
                 composing={
                   phase !== 'thinking' || !steps.length || steps.some((s) => s.state === 'run')
                     ? null

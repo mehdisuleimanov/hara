@@ -24,16 +24,23 @@ import { C, R } from '@/theme';
  * Əhməd's live reasoning: one row per real step (understanding + every tool call).
  * spinner → spring check / amber warn / red fail; value slides in when it arrives.
  */
-export function ThinkingTrace({ steps, done, composing }: { steps: AhmedStep[]; done?: boolean; composing?: string | null }) {
+export function ThinkingTrace({ steps, done, composing, elapsedMs }: { steps: AhmedStep[]; done?: boolean; composing?: string | null; elapsedMs?: number | null }) {
   const t = useTheme();
   if (!steps.length) return null;
   return (
     <Animated.View entering={FadeIn.duration(220)} layout={t.lite ? undefined : LinearTransition.springify().damping(20)} style={[styles.card, t.hc && styles.hc]}>
       <View style={styles.head}>
         <View style={[styles.headDot, { backgroundColor: done ? C.brand : C.ai }]} />
-        <Txt v="overline" color={done ? C.brandDark : C.ai}>
+        <Txt v="overline" color={done ? C.brandDark : C.ai} style={{ flex: 1 }}>
           {done ? 'Əhməd yoxladı' : 'Əhməd düşünür'}
         </Txt>
+        {done && elapsedMs ? (
+          <Animated.View entering={FadeIn.duration(300)}>
+            <Txt v="caption" color={C.muted} style={{ fontVariant: ['tabular-nums'] }}>
+              {`${(elapsedMs / 1000).toFixed(1).replace('.', ',')} san`}
+            </Txt>
+          </Animated.View>
+        ) : null}
       </View>
       {steps.map((s, i) => (
         <Row key={s.id} step={s} last={i === steps.length - 1} />
