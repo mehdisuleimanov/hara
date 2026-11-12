@@ -241,8 +241,8 @@ export default function AhmedScreen() {
     await useAhmedSession.getState().settled();
     const left = MIN_THINK_MS - (Date.now() - started);
     if (left > 0) await wait(left);
-    busy.current = false;
     if (my !== runId.current) return;
+    busy.current = false;
     finish(r);
   };
 
@@ -455,6 +455,15 @@ export default function AhmedScreen() {
           <Animated.View style={[{ width: orbSize, alignItems: 'center', justifyContent: 'flex-start', marginTop: 6 }, orbWrap]}>
             <Animated.View style={[{ width: orbSize, height: orbSize }, orbInner]}>
               <Orb size={orbSize} level={orbLevel} state={orbState} />
+              {phase === 'idle' && voice.speaking && voice.text ? (
+                <View pointerEvents="none" style={styles.sayWrap}>
+                  <Animated.View entering={enter(0, 'pop')} exiting={FadeOut.duration(160)} style={styles.sayPill}>
+                    <Txt v="label" color={C.ink} numberOfLines={2} center>
+                      {voice.text}
+                    </Txt>
+                  </Animated.View>
+                </View>
+              ) : null}
               <StageTrigger onFire={runDemo} style={[styles.badge, { right: orbSize * 0.04, bottom: orbSize * 0.04 }]}>
                 <TalkingAvatar size={38} level={voice.level} speaking={voice.speaking} />
               </StageTrigger>
@@ -603,6 +612,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadow(2),
+  },
+  sayWrap: { position: 'absolute', top: 8, left: -48, right: -48, alignItems: 'center' },
+  sayPill: {
+    maxWidth: 320,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: R.lg,
+    backgroundColor: '#FFFFFF',
     ...shadow(2),
   },
   youRow: { alignSelf: 'stretch', paddingHorizontal: 4 },
