@@ -285,6 +285,11 @@ function ResultsView({
   // ---- pins: destination drops in (overlay), then the real marker takes over
   const [landed, setLanded] = useState(Platform.OS === 'web');
   const [dropping, setDropping] = useState(false);
+  // safety net: the real marker always appears, even if the overlay could not be projected
+  useEffect(() => {
+    const id = setTimeout(() => setLanded(true), 2600);
+    return () => clearTimeout(id);
+  }, []);
 
   // ---- Son 50 metr: the pulsing "N zolaq" label appears once the red line is drawn
   const [lmLabel, setLmLabel] = useState(false);
