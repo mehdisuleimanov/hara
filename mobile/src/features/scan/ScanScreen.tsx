@@ -250,7 +250,12 @@ export function ScanScreen() {
         </Animated.View>
       ) : null}
 
-      {/* header */}
+      {/* header (scrim keeps white text readable over bright skies) */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(15,27,45,0.72)', 'rgba(15,27,45,0)']}
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, height: insets.top + 96 }}
+      />
       <View pointerEvents="box-none" style={[{ position: 'absolute', left: 0, right: 0, top: 0, paddingTop: insets.top + 8, paddingHorizontal: 16 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <CircleButton icon="chevron-left" bg="rgba(15,27,45,0.55)" color="#FFFFFF" size={46} onPress={back} />

@@ -133,7 +133,7 @@ export function rate(a: VisionAttrs): Rating {
     score += d;
     f.push({
       id: 'lanes',
-      label: gradeSep ? `${lanes} zolağın altından/üstündən keçir` : `${lanes} zolaq keçmək lazımdır`,
+      label: gradeSep ? `${lanes} zolağın ${t === 'underpass' ? 'altından' : 'üstündən'} keçirsən` : `${lanes} zolaq keçmək lazımdır`,
       state: gradeSep || lanes <= 2 ? 'ok' : lanes === 3 ? 'warn' : 'bad',
       delta: d,
       icon: 'road-variant',
