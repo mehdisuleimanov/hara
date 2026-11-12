@@ -1,12 +1,13 @@
 import type { LatLng } from './types';
 
 /**
- * [lat, lon, type, scoreDay, scoreNight, lanes, roadAxisDeg?, nameIdx?]
+ * [lat, lon, type, scoreDay, scoreNight, lanes, roadAxisDeg?, nameIdx?, evidenceFlags?]
  * type: 0 signals, 1 zebra, 2 unmarked, 3 grade-separated (underpass / footbridge)
  * roadAxisDeg: axis of the crossed road, 0–179 (−1 unknown); nameIdx: index into LAYER.names (−1 unnamed).
+ * evidenceFlags: bitmask of the OSM evidence behind the score, see crossingFactors().
  * Scores come from the iRAP-inspired attribute model in scripts/build-safety-layer.mjs (no random terms).
  */
-export type CrossingT = [number, number, number, number, number, number, number?, number?];
+export type CrossingT = [number, number, number, number, number, number, number?, number?, number?];
 /** k: road class 0 trunk .. 5 pedestrian; d/n: day/night score; c: flat coords */
 export type SegmentT = { k: number; d: number; n: number; c: number[] };
 
@@ -51,6 +52,25 @@ export const LAYER = {
 export function crossingStreet(c: CrossingT): string | null {
   const i = c[7];
   return i != null && i >= 0 ? (LAYER.names[i] ?? null) : null;
+}
+
+export const CF = { LIT_YES: 1, LIT_NO: 2, BUS: 4, SCHOOL: 8, ISOLATED: 16, ISLAND: 32, LANES_EST: 64, SERVICE: 128, LAMP: 256 } as const;
+
+/**
+ * Why a crossing scores what it scores — short Azerbaijani facts straight from the OSM evidence
+ * (e.g. ["Nişansız keçid", "4 zolaq", "Məktəb 150 m-də", "İşıqlandırma məlumatı yoxdur"]).
+ */
+export function crossingFactors(c: CrossingT): string[] {
+  const f = c[8] ?? 0;
+  const out = [CROSSING_TYPE[c[2]] ?? 'Keçid'];
+  if (c[5] > 0) out.push(`${c[5]} zolaq${f & CF.LANES_EST ? ' (təxmini)' : ''}`);
+  if (f & CF.SERVICE) out.push('Həyət / xidməti yol');
+  if (f & CF.ISLAND) out.push('Təhlükəsizlik adası var');
+  if (f & CF.SCHOOL) out.push('Məktəb və ya bağça 150 m-də');
+  if (f & CF.BUS) out.push('Avtobus dayanacağı yanında');
+  if (f & CF.ISOLATED) out.push('İşıqforlu keçid 250 m-dən uzaqdadır');
+  out.push(f & CF.LIT_YES ? (f & CF.LAMP ? 'Küçə işığı var' : 'İşıqlandırılır') : f & CF.LIT_NO ? 'İşıqlandırma yoxdur' : 'İşıqlandırma məlumatı yoxdur');
+  return out;
 }
 
 /** PERF: cache LatLng arrays per segment so re-renders don't rebuild them. */

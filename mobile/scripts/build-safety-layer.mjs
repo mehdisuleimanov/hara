@@ -47,7 +47,7 @@
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 //
 // Output tuples (src/data/layer.ts):
-//   crossings: [lat, lon, type, day, night, lanes, roadBearingDeg, nameIdx]
+//   crossings: [lat, lon, type, day, night, lanes, roadBearingDeg, nameIdx, evidenceFlags]
 //              type 0 signals · 1 zebra · 2 unmarked · 3 grade-separated (underpass/footbridge)
 //   segments:  { k: class 0 trunk … 5 pedestrian, d, n, c: flat [lat,lon,…] }
 //   names:     street names referenced by crossings[7] (−1 = unnamed)
@@ -66,6 +66,8 @@ const CLASS_CODE = {
 const CLASS_RANK = { trunk: 9, trunk_link: 8, primary: 7, primary_link: 6, secondary: 5, secondary_link: 4, tertiary: 3, tertiary_link: 3, unclassified: 2, residential: 2, living_street: 1, pedestrian: 0 };
 
 
+// evidence flags (crossings[8]) so the app can explain every score: see layer.ts crossingFactors()
+const F_LIT_YES = 1, F_LIT_NO = 2, F_BUS = 4, F_SCHOOL = 8, F_ISOLATED = 16, F_ISLAND = 32, F_LANES_EST = 64, F_SERVICE = 128, F_LAMP = 256;
 const r5 = (v) => Math.round(v * 1e5) / 1e5;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const toRad = (d) => (d * Math.PI) / 180;
@@ -341,7 +343,8 @@ async function main() {
     const lanesVerified = info?.lanesVerified ?? false;
     const speed = info?.speed ?? 30;
     let lit = t.lit === 'yes' || info?.lit === 'yes' ? 'yes' : t.lit === 'no' || info?.lit === 'no' ? 'no' : 'unknown';
-    if (lit === 'unknown' && lamps.near(c.lat, c.lon, 30).length) lit = 'yes';
+    let lampInferred = false;
+    if (lit === 'unknown' && lamps.near(c.lat, c.lon, 30).length) { lit = 'yes'; lampInferred = true; }
     const island = t['crossing:island'] === 'yes';
     const bus = type !== T_SIGNALS && busStops.near(c.lat, c.lon, 30).length > 0;
     const school = type !== T_SIGNALS && schools.near(c.lat, c.lon, 150).length > 0;
@@ -353,12 +356,13 @@ async function main() {
     if (lit === 'unknown') stat.litUnknown++;
     if (island) stat.island++;
     const { day, night } = crossingScore({ type, lanes, speed, lit, island, bus, school, isolated, lanesVerified });
-    crossings.push([r5(c.lat), r5(c.lon), type, day, night, lanes, road?.bearing ?? -1, info?.name ?? -1]);
+    const flags = (lit === 'yes' ? F_LIT_YES : 0) | (lit === 'no' ? F_LIT_NO : 0) | (bus ? F_BUS : 0) | (school ? F_SCHOOL : 0) | (isolated ? F_ISOLATED : 0) | (island ? F_ISLAND : 0) | (!lanesVerified ? F_LANES_EST : 0) | (!info ? F_SERVICE : 0) | (lampInferred ? F_LAMP : 0);
+    crossings.push([r5(c.lat), r5(c.lon), type, day, night, lanes, road?.bearing ?? -1, info?.name ?? -1, flags]);
   }
   for (const g of grade) {
     const lit = g.lit === 'yes' ? 'yes' : g.lit === 'no' ? 'no' : 'unknown';
     const { day, night } = crossingScore({ type: T_GRADE, lit });
-    crossings.push([r5(g.lat), r5(g.lon), T_GRADE, day, night, g.road.info.lanes, g.road.bearing, g.road.info.name]);
+    crossings.push([r5(g.lat), r5(g.lon), T_GRADE, day, night, g.road.info.lanes, g.road.bearing, g.road.info.name, lit === 'yes' ? F_LIT_YES : lit === 'no' ? F_LIT_NO : 0]);
   }
 
   // metro stations
