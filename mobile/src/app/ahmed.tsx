@@ -1,341 +1,669 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import {
-  AudioModule,
-  RecordingPresets,
-  setAudioModeAsync,
-  useAudioRecorder,
-  useAudioRecorderState,
-} from 'expo-audio';
-import { File } from 'expo-file-system';
+import { AudioModule, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
-import { askAhmed } from '@/ai/ahmed';
-import { DEMO_SENTENCE } from '@/ai/fallback';
-import { useAppStore, isNightNow } from '@/store/useAppStore';
-import type { AhmedResult } from '@/store/useAppStore';
-import { Orb } from '@/components/Orb';
-import { Waveform } from '@/components/Waveform';
-import { Pulse } from '@/components/anim';
-import { AhmedAvatar } from '@/components/Brand';
-import { CircleButton, Icon, Txt, tap } from '@/components/ui';
-import { speak, stopSpeaking } from '@/utils/tts';
+import Animated, { FadeIn, FadeOut, useAnimatedKeyboard, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { askAhmed, AHMED_SAY, DEMO_SENTENCE, scriptedReply, speakable } from '@/ai/ahmed';
+import { recommended } from '@/ai/script';
+import { useAppStore, useIsNight, type AhmedResult } from '@/store/useAppStore';
+import { usePrefs } from '@/store/prefs';
+import { useAhmedSession } from '@/store/ahmedSession';
+import { destById } from '@/data/destinations';
+import { crossingsNearTrack } from '@/data/layer';
+import { liveRouteById } from '@/features/routing/live';
+import { ThinkingTrace } from '@/features/ahmed/ThinkingTrace';
+import { ChipRow, HandoffCard, ListeningMeter, MicButton, ReplyBubble, StageTrigger, TalkingAvatar, type Suggestion } from '@/features/ahmed/parts';
+import { Orb, type OrbState } from '@/components/Orb';
+import { CircleButton, Icon, Txt } from '@/components/ui';
+import { PressableScale, SPRING, enter, useTypewriter } from '@/motion';
+import { prefetch, say, stop, useVoice, VOICE_RECORDING } from '@/voice';
+import { COMMON } from '@/voice/lines/common';
+import { getWeather } from '@/utils/weather';
+import { log } from '@/utils/log';
+import { useTheme } from '@/hooks/useTheme';
 import { C, F, R, shadow } from '@/theme';
 
 type Phase = 'idle' | 'listening' | 'thinking' | 'answer';
 
-const SUGGESTIONS = [
-  'Gecədir, uşaq arabası ilə Hilton-a',
-  'İçərişəhərə ən ucuz yol',
-  'Tələsirəm, Gənclik Mall-a',
-  'Skuterlə Port Baku-ya',
-];
+const MIN_THINK_MS = 1200;
+const AUDIO_MIME = Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4';
 
-export default function Ahmed() {
-  const params = useLocalSearchParams<{ mode?: string; demo?: string }>();
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+async function readBase64(uri: string): Promise<string> {
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    return await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result).split(',')[1] ?? '');
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(blob);
+    });
+  }
+  const { File } = await import('expo-file-system');
+  return await new File(uri).base64();
+}
+
+export default function AhmedScreen() {
+  const params = useLocalSearchParams<{ mode?: string; demo?: string; q?: string }>();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const t = useTheme();
+  const night = useIsNight();
   const aiEnabled = useAppStore((s) => s.aiEnabled);
-  const timeMode = useAppStore((s) => s.timeMode);
-  const setTimeMode = useAppStore((s) => s.setTimeMode);
   const setLastAhmed = useAppStore((s) => s.setLastAhmed);
+  const setTimeMode = useAppStore((s) => s.setTimeMode);
   const setProfile = useAppStore((s) => s.setProfile);
+  const steps = useAhmedSession((s) => s.steps);
 
-  const [phase, setPhase] = useState<Phase>('idle');
+  const [phase, setPhaseState] = useState<Phase>('idle');
+  const phaseRef = useRef<Phase>('idle');
+  const setPhase = (p: Phase) => {
+    phaseRef.current = p;
+    setPhaseState(p);
+  };
   const [textMode, setTextMode] = useState(params.mode === 'text');
   const [input, setInput] = useState('');
-  const [shown, setShown] = useState(''); // typed-out transcript
-  const [answer, setAnswer] = useState<AhmedResult | null>(null);
+  const [transcript, setTranscript] = useState('');
+  const [result, setResult] = useState<AhmedResult | null>(null);
+  const [handoffMs, setHandoffMs] = useState<number | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState<number | null>(null);
+
   const busy = useRef(false);
+  const runId = useRef(0);
+  const ttsReady = useRef<Promise<{ ok: number; failed: number } | null>>(Promise.resolve(null));
+  const leaving = useRef(false);
+  const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recStart = useRef(0);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
-  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
-  const rec = useAudioRecorderState(recorder, 80);
-  const level = rec.isRecording && rec.metering != null ? Math.max(0, Math.min(1, (rec.metering + 55) / 50)) : 0;
-  const secs = Math.floor((rec.durationMillis ?? 0) / 1000);
+  const recorder = useAudioRecorder(VOICE_RECORDING);
+  const voice = useVoice();
+  const orbLevel = useSharedValue(0);
+  const speakingSV = useSharedValue(0);
+  useEffect(() => {
+    speakingSV.value = voice.speaking ? 1 : 0;
+    if (!voice.speaking && phaseRef.current !== 'listening') orbLevel.value = 0;
+  }, [voice.speaking, speakingSV, orbLevel]);
+  useAnimatedReaction(
+    () => voice.level.value,
+    (v) => {
+      if (speakingSV.value) orbLevel.value = v;
+    },
+  );
 
-  // typewriter effect for the transcript
-  const typeOut = useCallback((text: string) => {
-    return new Promise<void>((resolve) => {
-      let i = 0;
-      const id = setInterval(() => {
-        i += 2;
-        setShown(text.slice(0, i));
-        if (i >= text.length) {
-          clearInterval(id);
-          resolve();
-        }
-      }, 28);
-    });
+  const [typed] = useTypewriter(transcript, 55);
+
+  // ---------- lifecycle ----------
+  useEffect(() => {
+    // warm the weather cache + spatial index while Əhməd is idle (tools answer instantly later)
+    getWeather().catch(() => {});
+    const id = setTimeout(() => {
+      try {
+        crossingsNearTrack([], 0);
+      } catch {}
+    }, 900);
+    return () => clearTimeout(id);
   }, []);
 
-  const finish = useCallback(
-    async (result: AhmedResult) => {
-      setAnswer(result);
-      setLastAhmed(result);
-      if (result.timeOfDay) setTimeMode(result.timeOfDay);
-      setProfile(result.profile === 'family' ? 'daily' : result.profile);
-      await typeOut(result.transcript);
-      setPhase('answer');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      if (result.profile === 'scooter') {
-        setTimeout(() => router.replace('/scooter?speak=1'), 900);
-      } else if (result.destId) {
-        setTimeout(() => router.replace(`/results/${result.destId}?kind=${result.preference}&speak=1`), 900);
-      } else {
-        speak(result.reply);
-      }
+  useEffect(() => {
+    if (params.demo === '1' || params.q) return;
+    const s = useAhmedSession.getState();
+    if (s.greeted) return;
+    const id = setTimeout(() => {
+      if (phaseRef.current !== 'idle' || busy.current) return;
+      useAhmedSession.getState().markGreeted();
+      say(night ? COMMON.greetNight : COMMON.greet);
+    }, 650);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (handoffTimer.current) clearTimeout(handoffTimer.current);
+      if (!leaving.current) stop();
+      try {
+        if (recorder.isRecording) recorder.stop();
+      } catch {}
     },
-    [setLastAhmed, setTimeMode, setProfile, typeOut],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
-  const run = useCallback(
-    async (payload: { text?: string; audioB64?: string; mime?: string }) => {
-      if (busy.current) return;
-      busy.current = true;
-      setPhase('thinking');
-      setShown('');
-      try {
-        const night = isNightNow(timeMode);
-        const result = await askAhmed(payload, { aiEnabled, night });
-        await finish(result);
-      } finally {
-        busy.current = false;
-      }
-    },
-    [aiEnabled, timeMode, finish],
-  );
+  // ---------- navigation ----------
+  const routeHref = (r: AhmedResult) => {
+    if (r.liveRouteId) return `/results/live:${r.liveRouteId}?from=ahmed&speak=0`;
+    if (r.profile === 'scooter') return '/scooter';
+    const rec = r.destId ? recommended(r.destId, r.preference, r.timeOfDay ? r.timeOfDay === 'night' : night) : undefined;
+    return `/results/${r.destId}?kind=${rec?.kind ?? r.preference}&from=ahmed&speak=0`;
+  };
+
+  const openRoute = useCallback((r: AhmedResult) => {
+    if (leaving.current) return;
+    leaving.current = true;
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    router.replace(routeHref(r) as never);
+  }, []);
+
+  const scheduleOpen = (r: AhmedResult, ms: number) => {
+    if (leaving.current) return;
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    handoffTimer.current = setTimeout(() => openRoute(r), ms);
+    setHandoffMs(ms);
+  };
+
+  // ---------- the run ----------
+  const finish = (r: AhmedResult) => {
+    const steps = useAhmedSession.getState().steps;
+    const full: AhmedResult = { ...r, steps };
+    setResult(full);
+    setTranscript(r.transcript || transcriptRef.current);
+    if (r.intent !== 'unclear') setLastAhmed(full);
+    if (r.timeOfDay) setTimeMode(r.timeOfDay);
+    if (r.intent === 'route') setProfile(r.profile === 'family' ? 'daily' : r.profile);
+    if (r.transcript && r.reply) useAhmedSession.getState().remember(r.transcript, r.reply);
+    setPhase('answer');
+    Haptics.notificationAsync(r.intent === 'unclear' ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250);
+
+    const navigates = r.intent === 'route' && (!!r.liveRouteId || (!!r.destId && !!destById(r.destId)));
+    const my = runId.current;
+    let started = false;
+    if (navigates) scheduleOpen(r, 8000); // open the cards while Əhməd talks; never wait forever for the voice
+    const speakIt = async () => {
+      // the reply's voice was being prepared while the trace settled; give it a moment more
+      const ready = await Promise.race([ttsReady.current, wait(4200).then(() => null)]);
+      if (my !== runId.current || leaving.current) return;
+      say(speakable(r.reply), {
+        live: !!ready?.ok,
+        maxWaitMs: 2500,
+        onStart: () => {
+          started = true;
+          if (navigates && my === runId.current) scheduleOpen(r, 2600);
+        },
+        onDone: () => {
+          if (navigates && !started && my === runId.current) scheduleOpen(r, 2200);
+        },
+      });
+    };
+    speakIt();
+  };
+
+  const transcriptRef = useRef('');
+  const run = async (payload: { text?: string; audioB64?: string; mime?: string }, opts: { asVoice?: boolean } = {}) => {
+    if (busy.current) return;
+    busy.current = true;
+    const my = ++runId.current;
+    stop();
+    Keyboard.dismiss();
+    leaving.current = false;
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    setHandoffMs(null);
+    setHint(null);
+    setResult(null);
+    setElapsed(null);
+    useAhmedSession.getState().resetSteps();
+    const typedText = payload.text && !opts.asVoice ? payload.text : '';
+    transcriptRef.current = typedText;
+    setTranscript(typedText);
+    setPhase('thinking');
+    const started = Date.now();
+    let r: AhmedResult;
+    try {
+      r = await askAhmed(payload, {
+        aiEnabled,
+        night,
+        asVoice: opts.asVoice,
+        history: useAhmedSession.getState().history,
+        onStep: (op) => {
+          if (my === runId.current) useAhmedSession.getState().push(op);
+        },
+        onTranscript: (tx) => {
+          if (my !== runId.current) return;
+          transcriptRef.current = tx;
+          setTranscript(tx);
+        },
+      });
+    } catch (e) {
+      log('[Əhməd] unexpected', String(e));
+      r = { transcript: typedText, destId: null, timeOfDay: null, profile: 'daily', preference: 'safest', companions: [], reply: COMMON.didntHear, source: 'fallback', intent: 'unclear' };
+    }
+    // stage safety: a failed recording runs the prepared sentence (only when enabled in the hidden panel)
+    if (my !== runId.current) return;
+    setElapsed(Date.now() - started);
+    if (payload.audioB64 && r.intent === 'unclear' && r.error && usePrefs.getState().stageFallback) {
+      busy.current = false;
+      return run({ text: DEMO_SENTENCE }, { asVoice: true });
+    }
+    // start preparing the voice now (clip → cache → live TTS) so it is ready when the answer shows
+    ttsReady.current = prefetch([speakable(r.reply)]).catch(() => ({ ok: 0, failed: 1 }));
+    await useAhmedSession.getState().settled();
+    const left = MIN_THINK_MS - (Date.now() - started);
+    if (left > 0) await wait(left);
+    if (my !== runId.current) return;
+    busy.current = false;
+    finish(r);
+  };
 
   const runDemo = useCallback(() => {
-    tap(Haptics.ImpactFeedbackStyle.Heavy);
-    run({ text: DEMO_SENTENCE });
-  }, [run]);
+    run({ text: DEMO_SENTENCE }, { asVoice: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (params.demo === '1') {
-      const t = setTimeout(runDemo, 500);
-      return () => clearTimeout(t);
+      const id = setTimeout(runDemo, 600);
+      return () => clearTimeout(id);
     }
-  }, [params.demo, runDemo]);
+    if (params.q) {
+      const id = setTimeout(() => run({ text: String(params.q) }), 400);
+      return () => clearTimeout(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.demo, params.q]);
 
-  useEffect(() => () => stopSpeaking(), []);
-
+  // ---------- voice capture ----------
   const startListening = async () => {
-    stopSpeaking();
+    if (busy.current) return;
+    stop();
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    setHandoffMs(null);
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
         setTextMode(true);
+        setHint(AHMED_SAY.noMic);
+        say(AHMED_SAY.noMic);
         return;
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
-      setAnswer(null);
-      setShown('');
+      recStart.current = Date.now();
+      setResult(null);
+      setHint(null);
+      useAhmedSession.getState().resetSteps();
+      setTranscript('');
       setPhase('listening');
-      tap(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
-      console.warn('record failed', e);
-      runDemo();
+      log('[Əhməd] record start failed', String(e));
+      setTextMode(true);
+      setHint('Hazırda mikrofon açılmadı. Yazaraq soruş, dərhal cavab verim.');
     }
   };
 
-  const stopAndSend = async () => {
-    if (phase !== 'listening') return;
+  const stopRecorder = async () => {
     try {
       await recorder.stop();
+    } catch {}
+    try {
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-      const uri = recorder.uri;
-      if (!uri || (rec.durationMillis ?? 0) < 600) {
-        // too short / nothing captured -> scripted demo sentence
-        run({ text: DEMO_SENTENCE });
-        return;
-      }
-      const b64 = await new File(uri).base64();
-      run({ audioB64: b64, mime: 'audio/m4a' });
+    } catch {}
+  };
+
+  const sendRecording = async () => {
+    if (phaseRef.current !== 'listening') return;
+    const dur = Date.now() - recStart.current;
+    await stopRecorder();
+    orbLevel.value = withSpring(0, SPRING.gentle);
+    const uri = recorder.uri;
+    if (!uri || dur < 600) {
+      setPhase('idle');
+      setHint(COMMON.tooShort);
+      say(COMMON.tooShort);
+      return;
+    }
+    try {
+      const b64 = await readBase64(uri);
+      if (!b64) throw new Error('empty recording');
+      run({ audioB64: b64, mime: AUDIO_MIME });
     } catch (e) {
-      console.warn('stop failed', e);
-      run({ text: DEMO_SENTENCE });
+      log('[Əhməd] read recording failed', String(e));
+      if (usePrefs.getState().stageFallback) return runDemo();
+      setPhase('idle');
+      setHint(COMMON.didntHear);
+      say(COMMON.didntHear);
     }
   };
 
   const cancel = async () => {
-    if (phase === 'listening') {
-      try {
-        await recorder.stop();
-      } catch {}
-    }
+    runId.current++;
+    busy.current = false;
+    if (phaseRef.current === 'listening') await stopRecorder();
+    orbLevel.value = withSpring(0, SPRING.gentle);
+    stop();
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    setHandoffMs(null);
+    useAhmedSession.getState().resetSteps();
+    setResult(null);
+    setTranscript('');
+    setHint(null);
     setPhase('idle');
-    setShown('');
-    setAnswer(null);
   };
 
+  const close = () => {
+    runId.current++;
+    leaving.current = true;
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    stop();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
+  const submitText = () => {
+    const q = input.trim();
+    if (!q) return;
+    setInput('');
+    run({ text: q });
+  };
+
+  // ---------- derived UI ----------
+  const orbState: OrbState = phase === 'listening' ? 'listening' : phase === 'thinking' ? 'thinking' : voice.speaking ? 'speaking' : 'idle';
+  const compact = phase === 'thinking' || phase === 'answer';
+  const orbSize = Math.min(width * 0.64, height * 0.34, 280);
+  const orbBox = useSharedValue(1);
+  useEffect(() => {
+    orbBox.value = withSpring(compact ? 0 : 1, SPRING.gentle);
+  }, [compact, orbBox]);
+  const smallOrb = 112;
+  const orbWrap = useAnimatedStyle(() => ({ height: smallOrb + (orbSize - smallOrb) * orbBox.value + 8 }));
+  const orbInner = useAnimatedStyle(() => {
+    const h = smallOrb + (orbSize - smallOrb) * orbBox.value;
+    return { transform: [{ translateY: h / 2 - orbSize / 2 }, { scale: h / orbSize }] };
+  });
+
   const status =
-    phase === 'listening' ? 'Dinləyirəm…' : phase === 'thinking' ? 'Fikirləşirəm…' : phase === 'answer' ? 'Hazırdır' : 'Əhməd hazırdır';
+    phase === 'listening' ? 'Dinləyir' : phase === 'thinking' ? 'Düşünür' : voice.speaking ? 'Danışır' : 'Hazırdır';
+  const statusColor = phase === 'listening' ? C.danger : phase === 'thinking' ? C.ai : C.brand;
+
+  const suggestions: Suggestion[] = useMemo(
+    () => [
+      { label: 'Gecə Hilton-a, uşaq arabası ilə', icon: 'weather-night', onPress: () => run({ text: 'Gecədir, uşaq arabası ilə Hilton-a getmək istəyirəm' }) },
+      { label: 'İçərişəhərə ən ucuz yol', icon: 'cash', onPress: () => run({ text: 'İçərişəhərə ən ucuz yol' }) },
+      { label: 'Tələsirəm, Gənclik Mall-a', icon: 'lightning-bolt-outline', onPress: () => run({ text: 'Tələsirəm, Gənclik Mall-a' }) },
+      { label: 'Nizami ətrafı gecə necədir?', icon: 'shield-half-full', onPress: () => run({ text: 'Gecə Nizami metrosu ətrafı təhlükəsizdir?' }) },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aiEnabled, night],
+  );
+
+  const followUps: Suggestion[] = useMemo(() => {
+    if (!result) return [];
+    const out: Suggestion[] = [];
+    if (result.intent === 'question') {
+      const d = result.destId ? destById(result.destId) : null;
+      if (d)
+        out.push({
+          label: `${d.short} — marşrut`,
+          icon: 'map-marker-path',
+          onPress: () => {
+            const routed: AhmedResult = { ...result, intent: 'route', preference: 'safest', reply: scriptedReply(d.id, 'safest', result.timeOfDay ? result.timeOfDay === 'night' : night) };
+            setLastAhmed(routed);
+            openRoute(routed);
+          },
+        });
+      const tx = result.transcript.replace(/\?+$/, '');
+      if (/gecə/i.test(tx)) out.push({ label: 'Bəs gündüz?', icon: 'white-balance-sunny', onPress: () => run({ text: `${tx.replace(/gecə/gi, 'gündüz')}?` }) });
+      else out.push({ label: 'Bəs gecə?', icon: 'weather-night', onPress: () => run({ text: `Gecə ${tx.charAt(0).toLowerCase()}${tx.slice(1)}?` }) });
+      out.push({ label: 'Yeni sual', icon: 'plus', onPress: cancel });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
+  const routeCard = useMemo(() => {
+    if (!result || result.intent !== 'route') return null;
+    if (result.liveRouteId) {
+      const lr = liveRouteById(result.liveRouteId);
+      const asked = result.steps?.find((s) => s.id.startsWith('route_to_place') && s.state === 'done')?.value?.replace(/ · tapıldı$/, '');
+      const best = lr ? [...lr.options].sort((a, b) => (night ? b.scoreNight - a.scoreNight : b.scoreDay - a.scoreDay))[0] : undefined;
+      return { title: asked ?? lr?.place.name ?? 'Marşrut hazırdır', sub: best ? `Ən az riskli · ${best.durationMin} dəq · ${best.price}` : 'Ən az riskli variant seçildi' };
+    }
+    const d = result.destId ? destById(result.destId) : null;
+    if (!d) return null;
+    const o = recommended(d.id, result.preference, result.timeOfDay ? result.timeOfDay === 'night' : night);
+    const kind = result.preference === 'cheapest' ? 'Ən sərfəli' : result.preference === 'fastest' ? 'Ən sürətli' : 'Ən az riskli';
+    return { title: d.name, sub: o ? `${kind} · ${o.durationMin} dəq · ${o.price}` : kind };
+  }, [result]);
+
+  // keyboard: the window does not resize edge-to-edge, so lift the content by the keyboard height (UI thread)
+  const kb = useAnimatedKeyboard();
+  const bottomInset = insets.bottom;
+  const kbPad = useAnimatedStyle(() => ({ paddingBottom: Math.max(0, kb.height.value - (kb.height.value > 0 ? bottomInset : 0)) }));
+
+  const showDock = phase === 'idle' || phase === 'listening' || phase === 'answer';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={['#EAF2FF', '#FFFFFF', '#E6F7EE']} style={StyleSheet.absoluteFill} />
-      <View style={[styles.blob, { top: 60, left: -80, backgroundColor: 'rgba(18,183,106,0.25)' }]} />
-      <View style={[styles.blob, { bottom: 140, right: -90, backgroundColor: 'rgba(15,27,45,0.05)' }]} />
+    <Animated.View style={[{ flex: 1, backgroundColor: C.bg }, kbPad]}>
+      <LinearGradient colors={['#EEF5FF', '#FFFFFF', '#FFFFFF']} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
 
-      <View style={{ flex: 1, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 16) }}>
+      <View style={{ flex: 1, paddingTop: insets.top + 6 }}>
         {/* header */}
-        <View style={styles.header}>
-          <CircleButton icon="chevron-left" size={50} onPress={() => router.back()} style={shadow(1)} />
-          <Txt w="bold" size={17}>
-            Əhməd
-          </Txt>
+        <Animated.View entering={enter(0, 'down')} style={styles.header}>
+          <CircleButton icon="chevron-down" size={46} onPress={close} label="Bağla" style={shadow(1)} bg="#FFFFFF" />
+          <View style={styles.statusPill}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Txt v="label" color={C.ink}>
+              Əhməd
+            </Txt>
+            <Txt v="label" color={C.muted}>
+              · {status}
+            </Txt>
+          </View>
           <CircleButton
             icon={textMode ? 'microphone-outline' : 'keyboard-outline'}
-            size={50}
-            onPress={() => setTextMode((v) => !v)}
+            size={46}
+            bg="#FFFFFF"
             style={shadow(1)}
+            onPress={() => {
+              if (phase === 'listening') cancel();
+              setTextMode((v) => !v);
+            }}
           />
-        </View>
+        </Animated.View>
 
-        <ScrollView contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
-          <Txt w="semi" size={15} color={phase === 'listening' ? C.ink : C.muted} style={{ marginTop: 18 }}>
-            {status}
-          </Txt>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 20, paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* orb + Əhməd */}
+          <Animated.View style={[{ width: orbSize, alignItems: 'center', justifyContent: 'flex-start', marginTop: 6 }, orbWrap]}>
+            <Animated.View style={[{ width: orbSize, height: orbSize }, orbInner]}>
+              <Orb size={orbSize} level={orbLevel} state={orbState} />
+              {phase === 'idle' && voice.speaking && voice.text ? (
+                <View pointerEvents="none" style={styles.sayWrap}>
+                  <Animated.View entering={enter(0, 'pop')} exiting={FadeOut.duration(160)} style={styles.sayPill}>
+                    <Txt v="label" color={C.ink} numberOfLines={2} center>
+                      {voice.text}
+                    </Txt>
+                  </Animated.View>
+                </View>
+              ) : null}
+              <StageTrigger onFire={runDemo} style={[styles.badge, { right: orbSize * 0.04, bottom: orbSize * 0.04 }]}>
+                <TalkingAvatar size={38} level={voice.level} speaking={voice.speaking} />
+              </StageTrigger>
+            </Animated.View>
+          </Animated.View>
 
-          <Pressable onLongPress={runDemo} delayLongPress={700} style={{ marginTop: 10 }}>
-            <Orb size={250} level={level} active={phase === 'listening' || phase === 'thinking'} />
-            <View style={styles.ahmedBadge}>
-              <AhmedAvatar size={34} mood={phase === 'answer' ? 'talk' : 'smile'} />
-            </View>
-          </Pressable>
-
-          {/* big two-tone text */}
-          <View style={{ minHeight: 120, marginTop: 6, justifyContent: 'center' }}>
-            {shown ? (
-              <Txt w="bold" size={25} lh={32} center>
-                “{shown}”
-              </Txt>
-            ) : phase === 'thinking' ? (
-              <Txt w="bold" size={25} lh={32} center color={C.faint}>
-                Marşrutları yoxlayıram…
-              </Txt>
-            ) : (
-              <Txt w="bold" size={25} lh={32} center>
-                <Txt w="bold" size={25} color={C.faint}>
-                  Hara getmək istədiyini{' '}
+          {phase === 'idle' ? (
+            <View style={{ alignItems: 'center', alignSelf: 'stretch' }}>
+              <Animated.View entering={enter(1, 'up')}>
+                <Txt v="h1" center color={C.ink} accessibilityRole="header" style={{ marginTop: 6 }}>
+                  Hara gedirsən?
                 </Txt>
-                səslə de, mən ən az riskli yolu tapım
-              </Txt>
-            )}
-          </View>
-
-          {answer && phase === 'answer' ? (
-            <View style={styles.replyCard}>
-              <Icon name="creation" size={18} color={C.navy} />
-              <Txt w="med" size={14.5} color={C.ink2} lh={20} style={{ flex: 1 }}>
-                {answer.reply}
-              </Txt>
+              </Animated.View>
+              <Animated.View entering={enter(2, 'up')}>
+                <Txt v="body" center color={C.muted} style={{ marginTop: 8, maxWidth: 300 }}>
+                  {hint ?? 'Səslə de və ya yaz,\nən az riskli yolu mən tapım.'}
+                </Txt>
+              </Animated.View>
+              {!textMode || !t.simple ? (
+                <View style={{ marginTop: 20 }}>
+                  <ChipRow items={suggestions} base={160} />
+                </View>
+              ) : null}
             </View>
           ) : null}
 
-          {phase === 'idle' ? (
-            <View style={styles.suggestions}>
-              {SUGGESTIONS.map((s) => (
-                <Pressable key={s} onPress={() => run({ text: s })} style={styles.suggestion}>
-                  <Txt w="semi" size={13.5}>
-                    {s}
+          {phase === 'listening' ? (
+            <Animated.View entering={FadeIn.duration(200)} style={{ alignItems: 'center' }}>
+              <Txt v="h1" center color={C.ink} style={{ marginTop: 6 }}>
+                Dinləyirəm…
+              </Txt>
+              <Txt v="body" center color={C.muted} style={{ marginTop: 8, maxWidth: 300 }}>
+                Məsələn: “Gecə Hilton-a necə gedim?”
+              </Txt>
+            </Animated.View>
+          ) : null}
+
+          {compact ? (
+            <View style={{ alignSelf: 'stretch', gap: 14, marginTop: 4 }}>
+              {transcript ? (
+                <Animated.View entering={FadeIn.duration(180)} style={styles.youRow}>
+                  <Txt v="overline" color={C.muted}>
+                    Sən
                   </Txt>
-                </Pressable>
-              ))}
+                  <Txt v="h3" color={C.ink} lh={25} style={{ marginTop: 3 }}>
+                    “{typed}
+                    {typed.length >= transcript.length ? '”' : ''}
+                  </Txt>
+                </Animated.View>
+              ) : null}
+
+              <ThinkingTrace
+                steps={steps}
+                done={phase === 'answer'}
+                elapsedMs={elapsed}
+                composing={
+                  phase !== 'thinking' || !steps.length || steps.some((s) => s.state === 'run')
+                    ? null
+                    : steps.length === 1
+                      ? steps[0].state === 'done'
+                        ? 'Nəyi yoxlayacağımı seçirəm…'
+                        : null
+                      : 'Cavabı hazırlayıram…'
+                }
+              />
+
+              {phase === 'answer' && result ? (
+                <>
+                  <ReplyBubble text={result.reply} level={voice.level} speaking={voice.speaking} />
+                  {routeCard && !leaving.current ? (
+                    <HandoffCard title={routeCard.title} sub={routeCard.sub} ms={handoffMs ?? 7000} onOpen={() => openRoute(result)} />
+                  ) : null}
+                  {followUps.length ? <ChipRow items={followUps} base={200} /> : null}
+                  {result.intent === 'unclear' || (result.intent === 'route' && !routeCard) ? <ChipRow items={suggestions.slice(0, 3)} base={200} /> : null}
+                </>
+              ) : null}
             </View>
           ) : null}
         </ScrollView>
 
-        {/* controls */}
+        {/* dock */}
         {textMode ? (
-          <View style={styles.inputRow}>
+          <Animated.View entering={enter(0, 'up')} style={[styles.inputRow, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <TextInput
               value={input}
               onChangeText={setInput}
               placeholder="Məs: Gecə Hilton-a necə gedim?"
               placeholderTextColor={C.faint}
-              style={styles.input}
+              style={[styles.input, { fontSize: t.font(16) }]}
               returnKeyType="send"
-              onSubmitEditing={() => input.trim() && run({ text: input.trim() })}
+              onSubmitEditing={submitText}
               autoFocus={params.mode === 'text'}
+              editable={phase !== 'thinking'}
+              accessibilityLabel="Əhmədə yaz"
             />
-            <CircleButton
-              icon="arrow-up"
-              size={52}
-              bg={C.brand}
-              color={C.navy}
-              onPress={() => input.trim() && run({ text: input.trim() })}
-            />
-          </View>
-        ) : (
-          <View style={{ alignItems: 'center', gap: 14 }}>
-            <Waveform level={level} active={phase === 'listening'} color={C.ink} />
-            <Pressable
-              onPress={() => (phase === 'listening' ? stopAndSend() : phase === 'thinking' ? null : startListening())}
-              style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.95 : 1 }] }]}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Göndər"
+              haptic="medium"
+              onPress={submitText}
+              disabled={!input.trim() || phase === 'thinking'}
+              style={[styles.send, { opacity: input.trim() && phase !== 'thinking' ? 1 : 0.45 }]}
             >
-              <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-              {phase === 'listening' ? <Pulse size={84} color={C.brand} duration={1300} /> : null}
-              <LinearGradient colors={['#7FE0B0', C.brand, '#1F6FEB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.mic}>
-                <Icon name={phase === 'listening' ? 'stop' : 'microphone'} size={34} color={C.navy} />
-              </LinearGradient>
+              <Icon name="arrow-up" size={24} color="#FFFFFF" />
+            </PressableScale>
+          </Animated.View>
+        ) : showDock ? (
+          <Animated.View entering={enter(1, 'up')} exiting={FadeOut.duration(120)} style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+            {phase === 'listening' ? <ListeningMeter recorder={recorder} level={orbLevel} onLimit={sendRecording} /> : null}
+            <View style={styles.dockRow}>
+              <View style={styles.side}>
+                {phase === 'listening' ? <CircleButton icon="close" size={52} onPress={cancel} label="Ləğv et" bg="#FFFFFF" style={shadow(1)} /> : null}
               </View>
-            </Pressable>
-            <View style={styles.controls}>
-              <CircleButton icon="close" size={54} onPress={cancel} style={shadow(1)} />
-              <Txt w="semi" size={16} color={C.ink2} style={{ fontFamily: F.semi, width: 70, textAlign: 'center' }}>
-                00:{String(Math.min(secs, 59)).padStart(2, '0')}
-              </Txt>
-              <CircleButton icon="check" size={54} onPress={stopAndSend} style={shadow(1)} />
+              <MicButton listening={phase === 'listening'} onPress={phase === 'listening' ? sendRecording : startListening} />
+              <View style={styles.side} />
             </View>
-          </View>
+            <Txt v="caption" color={C.muted} center>
+              {phase === 'listening' ? 'Bitirəndə toxun' : phase === 'answer' ? 'Yenə soruş' : 'Toxun və danış'}
+            </Txt>
+          </Animated.View>
+        ) : (
+          <View style={{ height: Math.max(insets.bottom, 14) + 8 }} />
         )}
       </View>
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  blob: { position: 'absolute', width: 260, height: 260, borderRadius: 130 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
-  ahmedBadge: {
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: R.pill,
+    backgroundColor: '#FFFFFF',
+    ...shadow(1),
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  badge: {
     position: 'absolute',
-    bottom: 6,
-    right: 18,
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: C.surface,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow(2),
   },
-  replyCard: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    padding: 14,
-    marginTop: 4,
-    ...shadow(1),
+  sayWrap: { position: 'absolute', top: 8, left: -48, right: -48, alignItems: 'center' },
+  sayPill: {
+    maxWidth: 320,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: R.lg,
+    backgroundColor: '#FFFFFF',
+    ...shadow(2),
   },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 },
-  suggestion: { backgroundColor: C.surface, borderRadius: R.pill, paddingHorizontal: 14, height: 38, justifyContent: 'center', ...shadow(1) },
-  mic: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', ...shadow(3) },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 24 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
+  youRow: { alignSelf: 'stretch', paddingHorizontal: 4 },
+  dock: { alignItems: 'center', gap: 2, paddingTop: 6 },
+  dockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18 },
+  side: { width: 60, alignItems: 'center' },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 8 },
   input: {
     flex: 1,
-    height: 56,
+    minWidth: 0,
+    height: 54,
     borderRadius: R.pill,
-    backgroundColor: C.surface,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     fontFamily: F.med,
-    fontSize: 16,
     color: C.ink,
+    borderWidth: 1,
+    borderColor: C.line,
     ...shadow(1),
   },
+  send: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center', ...shadow(2) },
 });
