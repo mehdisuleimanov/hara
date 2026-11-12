@@ -9,10 +9,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAppStore, useIsNight } from '@/store/useAppStore';
 import { prefs } from '@/store/prefs';
 import { destById } from '@/data/destinations';
-import { optionsFor, ROUTES } from '@/data/routes';
+import { optionsFor, ROUTES, summary } from '@/data/routes';
 import type { Destination, LatLng, RouteKind, RouteOption } from '@/data/types';
 import { liveRouteById, type LiveRoute } from '@/features/routing/live';
-import { scriptedReply } from '@/ai/ahmed';
 import { useMapLook } from '@/components/mapStyle';
 import { MeArrow, PinView } from '@/components/RouteLines';
 import { bestOption, cardTitle, RouteCard } from '@/components/RouteCard';
@@ -155,12 +154,18 @@ function ResultsView({
   }, [isLive, options]);
   const destLL = useMemo(() => ({ latitude: dest.lat, longitude: dest.lon }), [dest.lat, dest.lon]);
 
+  // Əhməd's own words when he planned this trip; otherwise a sentence built from the same data the
+  // cards show (so the text can never disagree with the "Ən az riskli" badge)
   const reply = useMemo(() => {
     if (ahmedCtx?.reply) return ahmedCtx.reply;
-    if (!isLive) return scriptedReply(destId, 'safest', night);
-    return `${dest.name} üçün ən az riskli yolu seçdim: ${opt.durationMin} dəqiqə, təhlükəsizlik balı ${score}.`;
+    const how = best.legs.some((l) => l.mode === 'taxi') ? 'taksi' : summary(best).replace(/^./, (c) => c.toLowerCase());
+    const s = night ? best.scoreNight : best.scoreDay;
+    let t = `${dest.name} üçün ${night ? 'bu gecə' : 'indi'} ən az riskli yol: ${how}, ${best.durationMin} dəqiqə, təhlükəsizlik balı ${s}.`;
+    if (best.reasons[0]) t += ` ${best.reasons[0]}.`;
+    if (lm?.wrongSide && lmOption && lmOption.id !== best.id) t += ' Taksi isə səni yolun qarşı tərəfində düşürür.';
+    return t.replace(/\.\./g, '.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ahmedCtx, destId, isLive, night]);
+  }, [ahmedCtx, best.id, night, dest.name]);
 
   // speak the reply on open (?speak=1); ?speak=0 or absent stays quiet
   useEffect(() => {
@@ -360,7 +365,8 @@ function ResultsView({
 
   const temp = weather?.tempC;
   const wind = weather?.windSpeed ?? storeWind;
-  const ordered = options;
+  // the recommended (highest-scored) option leads; order stays stable while you tap around
+  const ordered = useMemo(() => [...options].sort((a, b) => (a.id === best.id ? -1 : b.id === best.id ? 1 : 0)), [options, best.id]);
 
   return (
     <View

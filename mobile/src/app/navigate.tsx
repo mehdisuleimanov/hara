@@ -211,10 +211,19 @@ export default function Navigate() {
   const under = plan.legUnder[li];
   const stops = plan.stops[li];
   const stopK = stops ? stopIndex(stops, dist) : 0;
-  const nextIdx = plan.steps.findIndex((s) => s.atM > dist + 2);
+  const nextIdx = plan.steps.findIndex((s) => s.atM > dist + 2 && s.type !== 'depart');
   const next = nextIdx >= 0 ? plan.steps[nextIdx] : null;
   const toNext = next ? next.atM - dist : plan.track.total - dist;
-  const stepInfo = next ? STEP_TEXT[next.type] ?? STEP_TEXT.straight : STEP_TEXT.arrive;
+  const nextLegMode = plan.legMode[Math.min(plan.legMode.length - 1, li + 1)];
+  const stepInfo = !next
+    ? STEP_TEXT.arrive
+    : next.type === 'board'
+      ? nextLegMode === 'bus'
+        ? { text: 'avtobusa min', icon: 'bus' }
+        : nextLegMode === 'taxi'
+          ? { text: 'taksiyə otur', icon: 'taxi' }
+          : { text: 'metroya en', icon: 'subway-variant' }
+      : STEP_TEXT[next.type] ?? STEP_TEXT.straight;
   const remainingM = Math.max(0, plan.track.total - dist);
   const remMin = remainingMinutes(plan, dist);
   const hazardIdx = plan.hazards.findIndex((h) => h.atM - dist > 8 && h.atM - dist < 120);
