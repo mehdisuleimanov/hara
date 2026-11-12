@@ -10,6 +10,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { ROUTES } from '@/data/routes';
 import { MAP_STYLE } from '@/components/mapStyle';
 import { AhmedAvatar, Avatar } from '@/components/Brand';
+import { FamilyMascot } from '@/features/brand/FamilyMascot';
 import { ScoreRing } from '@/components/ScoreRing';
 import { Burst, Pop, Pulse } from '@/components/anim';
 import { CircleButton, Icon, PillButton, Tag, Txt } from '@/components/ui';
@@ -58,7 +59,7 @@ function Paywall() {
               <Avatar who="murad" size={70} />
             </Animated.View>
             <Animated.View entering={enter(3, 'pop', 120)} style={{ position: 'absolute', right: 0, top: -6 }}>
-              <AhmedAvatar size={112} full mood="wave" />
+              <FamilyMascot pose="wave" size={112} />
             </Animated.View>
           </View>
           <Animated.View entering={enter(2, 'up', 120)}>

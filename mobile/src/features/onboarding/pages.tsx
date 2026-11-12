@@ -21,6 +21,7 @@ import { BRAND } from '@/voice/lines/brand';
 import { C, R } from '@/theme';
 import type { Profile } from '@/data/types';
 import { MiniMap } from './MiniMap';
+import { OnboardingMascot } from './OnboardingMascot';
 
 /** Parallax for one page: art drifts slower than the page, text slightly faster; both fade. */
 export function useParallax(scrollX: SharedValue<number>, i: number, w: number) {
@@ -98,7 +99,7 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
           <View style={styles.bubbleTail} />
         </Animated.View>
         <Animated.View entering={enter(0, 'pop', 150)}>
-          <AhmedAvatar size={Math.min(w * 0.56, 230)} full mood="wave" speaking={voice.speaking} />
+          <OnboardingMascot pose="wave" size={Math.min(w * 0.56, 230)} speaking={voice.speaking} />
         </Animated.View>
       </Animated.View>
       <Copy

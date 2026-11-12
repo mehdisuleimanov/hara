@@ -6,7 +6,6 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -219,37 +218,11 @@ function TalkMouthLevel({ level, vb, w, h, mouthY }: { level: SharedValue<number
   );
 }
 
-const WAVE_ARM = mascotWaveArm();
-const BACK = mascotBack();
+/** Full-body limbs are static here (the animated full-body rig lives in features/mascot). */
+const BACK = [...mascotBack(), ...mascotWaveArm()];
 const GLOW = mascotGlow();
 
-function WaveArm({ vb, w, h, k, waving }: { vb: string; w: number; h: number; k: number; waving: boolean }) {
-  const v = useSharedValue(0);
-  const { lite } = useFx();
-  useEffect(() => {
-    if (!waving || lite || reduceMotion) {
-      cancelAnimation(v);
-      v.value = withTiming(0, { duration: 200 });
-      return;
-    }
-    const sw = (to: number, d = 230) => withTiming(to, { duration: d, easing: Easing.inOut(Easing.sin) });
-    v.value = withRepeat(withSequence(sw(1), sw(-0.7), sw(1), sw(-0.7), sw(0, 200), withDelay(1900, withTiming(0, { duration: 1 }))), -1, false);
-    return () => cancelAnimation(v);
-  }, [waving, lite, v]);
-  const { x: vx, y: vy } = parseVb(vb);
-  const dx = (PIVOT.shoulder.x - vx) * k - w / 2;
-  const dy = (PIVOT.shoulder.y - vy) * k - h / 2;
-  const a = useAnimatedStyle(() => ({
-    transform: [{ translateX: dx }, { translateY: dy }, { rotate: `${v.value * 13}deg` }, { translateX: -dx }, { translateY: -dy }],
-  }));
-  return (
-    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, width: w, height: h }, a]}>
-      <Layer shapes={WAVE_ARM} vb={vb} w={w} h={h} />
-    </Animated.View>
-  );
-}
-
-/** Gentle idle bob for the whole character. */
+/** Gentle idle bob (opt-in via `bob`). */
 function Bob({ amp, children, style }: { amp: number; children: React.ReactNode; style: StyleProp<ViewStyle> }) {
   const v = useSharedValue(0);
   const { lite } = useFx();
@@ -270,12 +243,12 @@ function Bob({ amp, children, style }: { amp: number; children: React.ReactNode;
 }
 
 /**
- * Əhməd — the AI companion. `full` draws the whole character (arms, legs, waving hand, glow);
+ * Əhməd — the AI companion. `full` draws the whole (static) character with the raised hand;
  * the default is the head-only pin for small avatars.
- * - `mood`: smile | talk | think | alert | wave (wave also waves the hand in the full variant)
+ * - `mood`: smile | talk | think | alert | wave (face expression)
  * - `blink`: natural random blink (default on for size ≥ 40)
  * - `speaking`: mouth follows Əhməd's voice level (useVoice)
- * - `bob`: idle float (default on for `full`)
+ * - `bob`: gentle idle float (opt-in)
  */
 export const AhmedAvatar = memo(function AhmedAvatar({
   size = 64,
@@ -302,7 +275,7 @@ export const AhmedAvatar = memo(function AhmedAvatar({
   const h = (size * box.h) / box.w;
   const k = size / box.w;
   const doBlink = blink ?? size >= 40;
-  const doBob = (bob ?? full) && size >= 40;
+  const doBob = !!bob && size >= 40;
   const m: Mood = mood;
 
   const head = useMemo(() => mascotHead(m, { withMouth: !speaking, withEyes: !doBlink }), [m, speaking, doBlink]);
@@ -313,7 +286,6 @@ export const AhmedAvatar = memo(function AhmedAvatar({
   const content = (
     <>
       {full || glow ? <Layer shapes={full ? [...(glow ? GLOW : []), ...BACK] : GLOW} vb={vb} w={w} h={h} /> : null}
-      {full ? <WaveArm vb={vb} w={w} h={h} k={k} waving={m === 'wave'} /> : null}
       <Layer shapes={head} vb={vb} w={w} h={h} body />
       {doBlink ? <BlinkEyes shapes={eyes} vb={vb} w={w} h={h} eyeY={eyeY} enabled={!reduceMotion} /> : null}
       {speaking ? <TalkMouth vb={vb} w={w} h={h} mouthY={mouthY} /> : null}
