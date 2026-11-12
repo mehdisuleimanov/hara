@@ -30,10 +30,13 @@ export const LegPolyline = memo(function LegPolyline({
   progress,
   zIndex = 6,
   dark,
+  opacity,
 }: {
   leg: Leg;
   state?: LegState;
   progress?: number;
+  /** inactive legs: fade-in opacity 0..1 */
+  opacity?: number;
   /** base zIndex (casing = zIndex, core = zIndex + 1) */
   zIndex?: number;
   /** dark basemap (night / satellite): softer casing */
@@ -59,14 +62,16 @@ export const LegPolyline = memo(function LegPolyline({
     );
   }
   if (state === 'inactive') {
+    const o = opacity == null ? 1 : Math.max(0, Math.min(1, opacity));
+    if (o <= 0) return null;
     return (
       <>
-        <Polyline coordinates={coords} strokeColor={dark ? 'rgba(15,27,45,0.55)' : 'rgba(255,255,255,0.95)'} strokeWidth={under ? 5 : 8} lineCap="round" lineJoin="round" zIndex={zIndex} />
+        <Polyline coordinates={coords} strokeColor={dark ? `rgba(15,27,45,${(0.55 * o).toFixed(2)})` : `rgba(255,255,255,${(0.95 * o).toFixed(2)})`} strokeWidth={under ? 5 : 8} lineCap="round" lineJoin="round" zIndex={zIndex} />
         <Polyline
           coordinates={coords}
-          strokeColor={dark ? '#9FB3D1' : '#8FA3C0'}
+          strokeColor={dark ? `rgba(159,179,209,${o.toFixed(2)})` : `rgba(122,142,173,${o.toFixed(2)})`}
           strokeWidth={under ? 2.5 : 4.5}
-          lineDashPattern={under ? [4, 8] : undefined}
+          lineDashPattern={under ? [4, 8] : [10, 7]}
           lineCap="round"
           lineJoin="round"
           zIndex={zIndex + 1}

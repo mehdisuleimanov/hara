@@ -219,6 +219,7 @@ export default function Navigate() {
   const remMin = remainingMinutes(plan, dist);
   const hazardIdx = plan.hazards.findIndex((h) => h.atM - dist > 8 && h.atM - dist < 120);
   const hazard: Hazard | null = hazardIdx >= 0 && mode === 'walk' ? plan.hazards[hazardIdx] : null;
+  const lmAlert = mode === 'taxi' && option.lastMeters?.wrongSide && plan.legEnd[li] - dist < 300 ? option.lastMeters : null;
   const alightName = stops ? stops.stations[stops.stations.length - 1]?.name : '';
   const street =
     mode === 'metro'
@@ -507,6 +508,26 @@ export default function Navigate() {
             </Animated.View>
           )}
           <CircleButton icon="close" size={42} bg={C.bg2} label="Naviqasiyanı bitir" onPress={finish} />
+        </Animated.View>
+      ) : null}
+
+      {/* Son 50 metr while still in the taxi */}
+      {lmAlert && !hazard && phase === 'go' ? (
+        <Animated.View key="lm-alert" entering={FadeInDown.springify().damping(15)} exiting={FadeOut.duration(200)} style={[styles.hazardWrap, { top: headerTop + 100 }]}>
+          <View style={[styles.hazard, { backgroundColor: '#FFF1F1', borderColor: C.danger }]}>
+            <View style={styles.hazardAvatar}>
+              <AhmedAvatar size={30} mood="talk" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Txt w="black" size={15.5} color="#9B1C22">
+                Qarşı tərəfdə düşürür · {lmAlert.lanes} zolaq
+              </Txt>
+              <Txt w="semi" size={13} color="#B4232A" style={{ marginTop: 2 }}>
+                Keçməyə tələsmə, işıqforlu keçidə aparacağam
+              </Txt>
+            </View>
+            <Icon name="traffic-light" size={26} color={C.brandDark} />
+          </View>
         </Animated.View>
       ) : null}
 

@@ -103,13 +103,15 @@ export const RouteLayer = memo(function RouteLayer({
   );
   const cross = useMemo(() => (sel && showCrossings && done ? crossingsAlong(sel) : []), [sel, showCrossings, done]);
   if (!sel || !geo) return null;
+  // alternatives fade in (4 steps -> only 4 native updates) once the selected line is on its way
+  const altOpacity = Math.round(Math.max(0, Math.min(1, (t - 0.15) / 0.5)) * 4) / 4;
   return (
     <>
       {/* alternatives fade in once the selected route is on its way */}
-      {t > 0.2
+      {altOpacity > 0
         ? options
             .filter((o) => o.id !== sel.id)
-            .flatMap((o) => o.legs.map((l, i) => <LegPolyline key={`${o.id}-${i}`} leg={l} state="inactive" zIndex={2} dark={dark} />))
+            .flatMap((o) => o.legs.map((l, i) => <LegPolyline key={`${o.id}-${i}`} leg={l} state="inactive" zIndex={2} dark={dark} opacity={altOpacity} />))
         : null}
       {/* soft glow underlay: the whole path, the line then traces over it */}
       {sel.legs.map((l, i) =>
