@@ -417,7 +417,9 @@ export default function AhmedScreen() {
     if (!result || result.intent !== 'route') return null;
     if (result.liveRouteId) {
       const lr = liveRouteById(result.liveRouteId);
-      return { title: lr?.place.name ?? 'Marşrut hazırdır', sub: 'Ən az riskli variant seçildi' };
+      const asked = result.steps?.find((s) => s.id.startsWith('route_to_place') && s.state === 'done')?.value?.replace(/ · tapıldı$/, '');
+      const best = lr ? [...lr.options].sort((a, b) => (night ? b.scoreNight - a.scoreNight : b.scoreDay - a.scoreDay))[0] : undefined;
+      return { title: asked ?? lr?.place.name ?? 'Marşrut hazırdır', sub: best ? `Ən az riskli · ${best.durationMin} dəq · ${best.price}` : 'Ən az riskli variant seçildi' };
     }
     const d = result.destId ? destById(result.destId) : null;
     if (!d) return null;

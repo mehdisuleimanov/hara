@@ -253,6 +253,7 @@ async function routeToPlace(args: Json, ctx: ToolCtx): Promise<Json> {
   ctx.onLive?.(r);
   return {
     found: true,
+    query: q,
     place: r.place.name,
     district: r.place.district,
     options: r.options.map((o) => optionJson(o, ctx.night, [...r.options].sort((a, b) => score(b, ctx.night) - score(a, ctx.night))[0])),
@@ -369,7 +370,9 @@ export function stepOutcome(name: string, r: Json): Pick<AhmedStep, 'value' | 's
     }
     case 'route_to_place': {
       if (!r.found) return { value: 'hələ tanımıram', state: 'warn' };
-      return { value: String(r.place), state: 'done' };
+      // show the place in the user's own words (geocoders often answer in English)
+      const q = String(r.query ?? r.place);
+      return { value: `${q.charAt(0).toLocaleUpperCase('az')}${q.slice(1)} · tapıldı`, state: 'done' };
     }
   }
   return { value: undefined, state: 'done' };
