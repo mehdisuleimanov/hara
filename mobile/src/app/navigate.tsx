@@ -212,26 +212,44 @@ export default function Navigate() {
   const stops = plan.stops[li];
   const stopK = stops ? stopIndex(stops, dist) : 0;
   const nextIdx = plan.steps.findIndex((s) => s.atM > dist + 2 && s.type !== 'depart');
-  const next = nextIdx >= 0 ? plan.steps[nextIdx] : null;
-  const toNext = next ? next.atM - dist : plan.track.total - dist;
+  const rawNext = nextIdx >= 0 ? plan.steps[nextIdx] : null;
   const nextLegMode = plan.legMode[Math.min(plan.legMode.length - 1, li + 1)];
-  const stepInfo = !next
-    ? STEP_TEXT.arrive
-    : next.type === 'board'
-      ? nextLegMode === 'bus'
-        ? { text: 'avtobusa min', icon: 'bus' }
-        : nextLegMode === 'taxi'
-          ? { text: 'taksiyə otur', icon: 'taxi' }
-          : { text: 'metroya en', icon: 'subway-variant' }
-      : STEP_TEXT[next.type] ?? STEP_TEXT.straight;
+  // a step on a later leg with another mode (e.g. the taxi's turns while you walk to it) is not your
+  // maneuver: show the transfer itself ("taksiyə otur", "metroya en") at the end of this leg
+  const transfer = li + 1 < plan.legMode.length && nextLegMode !== plan.legMode[li] && (!rawNext || (rawNext.leg != null && rawNext.leg > li));
+  const next = transfer ? null : rawNext;
+  const toNext = transfer ? plan.legEnd[li] - dist : next ? next.atM - dist : plan.track.total - dist;
+  const TRANSFER: Record<string, { text: string; icon: string }> = {
+    taxi: { text: 'taksiyə otur', icon: 'taxi' },
+    metro: { text: 'metroya en', icon: 'subway-variant' },
+    bus: { text: 'avtobusa min', icon: 'bus' },
+    walk: { text: plan.legMode[li] === 'taxi' ? 'taksidən düş' : 'piyada davam et', icon: 'walk' },
+    scooter: { text: 'skuterə min', icon: 'scooter' },
+    bike: { text: 'velosipedə min', icon: 'bike' },
+  };
+  const stepInfo = transfer
+    ? TRANSFER[nextLegMode] ?? STEP_TEXT.straight
+    : !next
+      ? STEP_TEXT.arrive
+      : next.type === 'board'
+        ? TRANSFER[nextLegMode] ?? TRANSFER.metro
+        : STEP_TEXT[next.type] ?? STEP_TEXT.straight;
   const remainingM = Math.max(0, plan.track.total - dist);
   const remMin = remainingMinutes(plan, dist);
   const hazardIdx = plan.hazards.findIndex((h) => h.atM - dist > 8 && h.atM - dist < 120);
   const hazard: Hazard | null = hazardIdx >= 0 && mode === 'walk' ? plan.hazards[hazardIdx] : null;
   const lmAlert = mode === 'taxi' && option.lastMeters?.wrongSide && plan.legEnd[li] - dist < 300 ? option.lastMeters : null;
   const alightName = stops ? stops.stations[stops.stations.length - 1]?.name : '';
-  const street =
-    mode === 'metro'
+  const nextStop = plan.stops[li + 1]?.stations[0]?.name;
+  const street = transfer && !plan.legUnder[li]
+    ? nextLegMode === 'metro'
+      ? `${nextStop ?? 'Metro'} stansiyası`
+      : nextLegMode === 'bus'
+        ? `${nextStop ?? 'Avtobus'} dayanacağı`
+        : nextLegMode === 'taxi'
+          ? 'Taksiyə minmə nöqtəsi'
+          : destShort
+    : mode === 'metro'
       ? `${alightName}-də düş`
       : mode === 'bus'
         ? `${alightName} dayanacağında düş`
@@ -295,7 +313,8 @@ export default function Navigate() {
     if (stops && stopK > 0) once(`stop-${li}-${stopK}`, () => Haptics.selectionAsync().catch(() => {}));
     if (mode === 'taxi' && option.lastMeters?.wrongSide && plan.legEnd[li] - dist < 260) once(`lm-${li}`, () => speakQ(NAV.taxiWrongSide, true));
     // turns (walking / riding on the surface)
-    if (!under && next && toNext < 38 && TURN_LINE[next.type]) once(`turn-${nextIdx}`, () => speakQ(TURN_LINE[next.type]));
+    // turns are spoken only when YOU make them (walking / scooter), not the taxi driver's
+    if (!under && mode !== 'taxi' && mode !== 'bus' && next && toNext < 38 && TURN_LINE[next.type]) once(`turn-${nextIdx}`, () => speakQ(TURN_LINE[next.type]));
     // risky crossing ahead -> Əhməd re-routes to the signalized one
     if (hazard && hazard.atM - dist <= 85) {
       once(`hz-${hazardIdx}`, () => {
