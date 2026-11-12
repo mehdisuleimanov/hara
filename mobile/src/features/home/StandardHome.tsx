@@ -8,13 +8,14 @@ import { useWeather } from '@/utils/weather';
 import { Avatar, HaraWordmark } from '@/components/Brand';
 import { DevTrigger } from '@/components/DevTrigger';
 import { Icon, Txt } from '@/components/ui';
-import { TAB_BAR_SPACE } from '@/components/TabBar';
+import { useTabBarSpace } from '@/components/TabBar';
 import { PressableScale, Skeleton, enter } from '@/motion';
 import { C, R } from '@/theme';
 import { AhmedHero } from './AhmedHero';
 import { FeatureGrid } from './FeatureGrid';
 import { RiskInsight } from './RiskInsight';
 import { RecentPlaces } from './RecentPlaces';
+import { TopFade } from './TopFade';
 import { USER_NAME, ahmedLine, greeting, nearbyReports } from './context';
 
 const fmt1 = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
@@ -33,11 +34,13 @@ export function StandardHome() {
   const reports = useAppStore((s) => s.reports);
   const nearby = useMemo(() => nearbyReports(reports).length, [reports]);
   const line = ahmedLine(weather, night);
+  const tabSpace = useTabBarSpace();
 
   return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView
-      style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: TAB_BAR_SPACE + insets.bottom + 16, paddingHorizontal: 16 }}
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: tabSpace + 12, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
       {/* top bar */}
@@ -127,6 +130,8 @@ export function StandardHome() {
       </Animated.View>
       <RecentPlaces night={night} base={8} />
     </ScrollView>
+    <TopFade />
+    </View>
   );
 }
 

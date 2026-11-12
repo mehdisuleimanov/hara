@@ -16,13 +16,14 @@ import { say } from '@/voice';
 import { A11Y } from '@/voice/lines/a11y';
 import { C, C_HC, R, shadow } from '@/theme';
 import { USER_NAME, greeting } from '@/features/home/context';
+import { TopFade } from '@/features/home/TopFade';
 import { morphTo } from './morph';
 import { ModePicker } from './ModePicker';
 import { Speak, pointOf, speakText } from './Speak';
 
 const PLACES = [
   { id: 'ev', title: 'Ev', sub: 'Əhmədli', icon: 'home-variant', line: A11Y.goHome },
-  { id: 'hilton', title: 'Hilton', sub: 'Azadlıq prospekti', icon: 'office-building', line: A11Y.goHilton },
+  { id: 'hilton', title: 'Hilton', sub: 'Azadlıq pr.', icon: 'office-building', line: A11Y.goHilton },
   { id: 'icherisheher', title: 'Nənənin evi', sub: 'İçərişəhər', icon: 'heart', line: A11Y.goNene },
 ] as const;
 
@@ -92,9 +93,9 @@ export function SimpleHome() {
             style={[styles.mic, { backgroundColor: P.brand }, border, !t.hc && shadow(2)]}
           >
             <View style={styles.micDisc}>
-              <Pulse size={96} color="#FFFFFF" />
+              <Pulse size={84} color="#FFFFFF" />
               <View style={styles.micInner}>
-                <Icon name="microphone" size={46} color={P.brand} />
+                <Icon name="microphone" size={40} color={P.brand} />
               </View>
             </View>
             <View style={{ flex: 1 }}>
@@ -102,7 +103,7 @@ export function SimpleHome() {
                 Əhmədlə danış
               </Txt>
               <Txt w="semi" size={15} color="rgba(255,255,255,0.9)" style={{ marginTop: 4 }}>
-                Toxun və de: «Evə apar»
+                Toxun və danış
               </Txt>
             </View>
           </PressableScale>
@@ -135,21 +136,23 @@ export function SimpleHome() {
                     <Icon name={p.icon} size={30} color={t.hc ? '#FFFFFF' : p.id === 'icherisheher' ? C.danger : C.ink} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Txt w="xbold" size={21}>
+                    <Txt w="xbold" size={21} numberOfLines={1}>
                       {p.title}
                     </Txt>
-                    <Txt w="semi" size={14} color={C.muted}>
-                      {o ? `${o.durationMin} dəq · ${p.sub}` : p.sub}
-                    </Txt>
-                  </View>
-                  {sc != null ? (
-                    <View style={[styles.safe, { backgroundColor: t.hc ? C_HC.safe : C.safeSoft }]}>
-                      <Icon name="shield-check" size={16} color={t.hc ? '#FFFFFF' : C.safe} />
-                      <Txt w="bold" size={13} color={t.hc ? '#FFFFFF' : C.safe}>
-                        {sc}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                      {sc != null ? (
+                        <View style={[styles.safe, { backgroundColor: t.hc ? C_HC.safe : C.safeSoft }]}>
+                          <Icon name="shield-check" size={15} color={t.hc ? '#FFFFFF' : C.safe} />
+                          <Txt w="bold" size={13} color={t.hc ? '#FFFFFF' : C.safe}>
+                            {sc}
+                          </Txt>
+                        </View>
+                      ) : null}
+                      <Txt w="semi" size={14} color={C.muted} numberOfLines={1}>
+                        {o ? `${o.durationMin} dəq · ${p.sub}` : p.sub}
                       </Txt>
                     </View>
-                  ) : null}
+                  </View>
                   <Icon name="chevron-right" size={28} color={C.ink} />
                 </PressableScale>
               </Animated.View>
@@ -213,6 +216,7 @@ export function SimpleHome() {
           </Txt>
         </Pressable>
       </ScrollView>
+      <TopFade />
 
       <Modal visible={callOpen} transparent animationType="fade" onRequestClose={() => setCallOpen(false)}>
         <Pressable style={styles.scrim} onPress={() => setCallOpen(false)}>
@@ -262,12 +266,12 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   avatar: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   back: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, borderRadius: R.pill, backgroundColor: C.surface },
-  mic: { marginTop: 18, borderRadius: 36, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 18, minHeight: 150 },
-  micDisc: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
-  micInner: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  mic: { marginTop: 18, borderRadius: 36, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 150 },
+  micDisc: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+  micInner: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   place: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: R.lg, padding: 14 },
   placeIcon: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  safe: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 10, borderRadius: R.pill },
+  safe: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 9, borderRadius: R.pill },
   duo: { flexDirection: 'row', gap: 10, marginTop: 14 },
   big: { flex: 1, borderRadius: R.lg, padding: 16, alignItems: 'center', justifyContent: 'center', gap: 10 },
   bigDisc: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },

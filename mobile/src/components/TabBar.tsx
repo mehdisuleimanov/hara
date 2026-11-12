@@ -135,7 +135,7 @@ export function TabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
     >
       <View style={[StyleSheet.absoluteFill, styles.glassClip, t.hc && { borderWidth: 2, borderColor: C_HC.line }]}>
         {Platform.OS === 'ios' ? <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} /> : null}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: t.hc ? '#FFFFFF' : 'rgba(255,255,255,0.94)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: t.hc || Platform.OS !== 'ios' ? '#FFFFFF' : 'rgba(255,255,255,0.86)' }]} />
       </View>
       {slot ? (
         <Animated.View
