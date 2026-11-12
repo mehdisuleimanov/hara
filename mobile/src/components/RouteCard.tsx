@@ -182,8 +182,8 @@ export const RouteCard = React.memo(function RouteCard({
         <ScoreRing score={s} size={58} showShield={false} delay={ringDelay} />
       </View>
       <View style={{ flex: 1, gap: 7 }} pointerEvents="box-none">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="none">
-          <Txt w="xbold" size={16.5} numberOfLines={1} style={{ flexShrink: 1 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 }} pointerEvents="none">
+          <Txt w="xbold" size={16.5} numberOfLines={1}>
             {title ?? KIND_LABEL[option.kind]}
           </Txt>
           {recommended ? (
