@@ -85,6 +85,16 @@ export const LastMetersLayer = memo(function LastMetersLayer({
       <SnapMarker coordinate={drop} anchor={{ x: 0.5, y: 0.5 }} zIndex={52}>
         <PinBadge icon="taxi" bg={C.navy} />
       </SnapMarker>
+      {/* where the driver should stop instead (same side as the entrance) */}
+      {!moved && lm.betterDrop && tGreen >= 1 ? (
+        <SnapMarker coordinate={{ latitude: lm.betterDrop.lat, longitude: lm.betterDrop.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={48}>
+          <View style={{ padding: 4 }}>
+            <View style={styles.better}>
+              <Icon name="map-marker-check" size={18} color={C.brandDark} />
+            </View>
+          </View>
+        </SnapMarker>
+      ) : null}
       {/* web preview: the pulsing overlay isn't available -> static label */}
       {Platform.OS === 'web' && !moved && mid && tRed >= 1 ? (
         <SnapMarker coordinate={mid} anchor={{ x: 0.5, y: 0.5 }} zIndex={55}>
@@ -240,6 +250,17 @@ const styles = StyleSheet.create({
     ...shadow(2),
   },
   badge: { alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FFFFFF', ...shadow(2) },
+  better: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderWidth: 2.5,
+    borderColor: C.brand,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   card: {
     position: 'absolute',
     left: 0,

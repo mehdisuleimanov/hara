@@ -10,7 +10,7 @@ import { useAppStore, useIsNight } from '@/store/useAppStore';
 import { prefs } from '@/store/prefs';
 import { destById } from '@/data/destinations';
 import { optionsFor, ROUTES, summary } from '@/data/routes';
-import type { Destination, LatLng, RouteKind, RouteOption } from '@/data/types';
+import type { Destination, LastMeters, LatLng, RouteKind, RouteOption } from '@/data/types';
 import { liveRouteById, type LiveRoute } from '@/features/routing/live';
 import { useMapLook } from '@/components/mapStyle';
 import { speakable } from '@/ai/script';
@@ -274,22 +274,21 @@ function ResultsView({
     settleRef.current(best, vy);
   }
 
-  // ---- route drawing: restarts on route change, day/night switch
-  const t = useDrawProgress(`${opt.id}|${night ? 'n' : 'd'}`, { duration: fromAhmed ? 1300 : 1000, delay: fromAhmed ? 420 : 220 });
-
   // ---- pins: destination drops in (overlay), then the real marker takes over
   const [landed, setLanded] = useState(Platform.OS === 'web');
   const [dropping, setDropping] = useState(false);
 
-  // ---- Son 50 metr
-  const tRed = useDrawProgress(`lmr-${lmNonce}`, { duration: 900, delay: 1100, enabled: lmOpen });
-  const tGreen = useDrawProgress(`lmg-${lmNonce}`, { duration: 1300, delay: 2100, enabled: lmOpen });
-  const dropTarget = useMemo<LatLng | null>(() => {
-    if (!lm) return null;
-    const p = moved && lm.betterDrop ? lm.betterDrop : lm.drop;
-    return { latitude: p.lat, longitude: p.lon };
-  }, [lm, moved]);
-  const dropPos = useTweenCoord(dropTarget, 800);
+  // ---- Son 50 metr: the pulsing "N zolaq" label appears once the red line is drawn
+  const [lmLabel, setLmLabel] = useState(false);
+  const lmLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showLabelLater = () => {
+    setLmLabel(false);
+    if (lmLabelTimer.current) clearTimeout(lmLabelTimer.current);
+    lmLabelTimer.current = setTimeout(() => setLmLabel(true), 2050);
+  };
+  useEffect(() => () => {
+    if (lmLabelTimer.current) clearTimeout(lmLabelTimer.current);
+  }, []);
 
   const openLastMeters = useCallback(() => {
     if (!lm) return;
@@ -298,6 +297,7 @@ function ResultsView({
     setMoved(false);
     setLmNonce((n) => n + 1);
     setLmOpen(true);
+    showLabelLater();
     Animated.spring(y, { toValue: snapYRef.current.hidden, tension: 60, friction: 12, useNativeDriver: ND }).start();
     const pts = [...[lm.directC, lm.safeC].flatMap((c) => {
       const out: LatLng[] = [];
@@ -332,6 +332,7 @@ function ResultsView({
   };
   const revertDrop = () => {
     tap();
+    showLabelLater();
     setMoved(false);
     setLmNonce((n) => n + 1);
   };
@@ -404,7 +405,7 @@ function ResultsView({
         showsBuildings={lmOpen}
         rotateEnabled={false}
       >
-        {!lmOpen ? <RouteLayer options={options} selectedId={opt.id} t={t} night={night} dark={look.dark} /> : null}
+        {!lmOpen ? <DrawnRoute options={options} selectedId={opt.id} night={night} dark={look.dark} fromAhmed={fromAhmed} /> : null}
         <SnapMarker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }} zIndex={30}>
           <MeArrow size={34} heading={20} />
         </SnapMarker>
@@ -413,7 +414,7 @@ function ResultsView({
             <PinView icon={dest.icon} color={C.navy} />
           </SnapMarker>
         ) : null}
-        {lmOpen && lm && dropPos ? <LastMetersLayer lm={lm} drop={dropPos} dest={destLL} tRed={tRed} tGreen={tGreen} moved={moved} /> : null}
+        {lmOpen && lm ? <DrawnLastMeters key={lmNonce} lm={lm} dest={destLL} moved={moved} /> : null}
       </MapView>
 
       {/* screen overlays pinned to coordinates (native) */}
@@ -443,7 +444,7 @@ function ResultsView({
           )}
         </Anchored>
       ) : null}
-      {lmOpen && lm && !moved && tRed >= 1 ? <LastMetersLabel api={overlay} lm={lm} visible /> : null}
+      {lmOpen && lm && !moved && lmLabel ? <LastMetersLabel api={overlay} lm={lm} visible /> : null}
 
       <NightVeil night={night} />
 
@@ -632,6 +633,25 @@ function ResultsView({
       ) : null}
     </View>
   );
+}
+
+/** Owns the ~30 fps draw progress so only the map layer re-renders while the line traces. */
+function DrawnRoute({ options, selectedId, night, dark, fromAhmed }: { options: RouteOption[]; selectedId: string; night: boolean; dark: boolean; fromAhmed: boolean }) {
+  const t = useDrawProgress(`${selectedId}|${night ? 'n' : 'd'}`, { duration: fromAhmed ? 1300 : 1000, delay: fromAhmed ? 420 : 220 });
+  return <RouteLayer options={options} selectedId={selectedId} t={t} night={night} dark={dark} />;
+}
+
+/** Son 50 metr map layer: red line first, then the safe walk; the taxi pin springs when moved. */
+function DrawnLastMeters({ lm, dest, moved }: { lm: LastMeters; dest: LatLng; moved: boolean }) {
+  const tRed = useDrawProgress('lmr', { duration: 900, delay: 1100 });
+  const tGreen = useDrawProgress('lmg', { duration: 1300, delay: 2100 });
+  const target = useMemo<LatLng>(() => {
+    const p = moved && lm.betterDrop ? lm.betterDrop : lm.drop;
+    return { latitude: p.lat, longitude: p.lon };
+  }, [lm, moved]);
+  const drop = useTweenCoord(target, 800);
+  if (!drop) return null;
+  return <LastMetersLayer lm={lm} drop={drop} dest={dest} tRed={tRed} tGreen={tGreen} moved={moved} />;
 }
 
 function LinkChip({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
