@@ -351,7 +351,8 @@ export function stepOutcome(name: string, r: Json): Pick<AhmedStep, 'value' | 's
       const unsig = Number(r.unsignalized_total);
       if (r.scope === 'area') return { value: `${total} keçid, ${unsig} işıqforsuz · ${r.radius_m} m`, state: 'done' };
       if (r.scope === 'city') return { value: `${fmt(total)} keçid yoxlandı`, state: 'done' };
-      return { value: total ? `${total} keçid, ${unsig} işıqforsuz` : 'risksiz keçid yolu', state: 'done' };
+      if (!total) return { value: Number(r.walked_m) > 0 ? 'yolda keçid yoxdur' : 'piyada hissəsi yoxdur', state: 'done' };
+      return { value: `${total} keçid, ${unsig} işıqforsuz`, state: 'done' };
     }
     case 'check_taxi_dropoff': {
       if (!r.found || !r.has_taxi_option) return { value: 'taksi variantı yoxdur', state: 'done' };

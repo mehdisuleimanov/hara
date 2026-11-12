@@ -302,7 +302,7 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
 
   // Audio we could not understand → honest "didn't hear" (never a substituted sentence).
   if (!u && isAudio) {
-    emit({ type: 'update', id: 'understand', patch: { label: 'Səs aydın deyil', state: 'warn', value: undefined } });
+    emit({ type: 'update', id: 'understand', patch: { label: 'Səsi aydın eşitmədim', state: 'warn', value: undefined } });
     return makeResult({ transcript: '', reply: COMMON.didntHear, intent: 'unclear', source: 'fallback' }, error);
   }
 

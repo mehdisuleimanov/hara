@@ -200,6 +200,7 @@ export function Orb({ size = 240, level, active = true, state }: Props) {
         <Svg width={core} height={core} style={{ position: 'absolute' }}>
           <Circle cx={R} cy={R} r={R} fill={`url(#s${uid})`} />
           <Circle cx={R} cy={R} r={R} fill={`url(#g${uid})`} />
+          <Circle cx={R} cy={R} r={R - 1} fill="none" stroke="#FFFFFF" strokeOpacity={0.35} strokeWidth={1.5} />
         </Svg>
       </Animated.View>
     </View>
