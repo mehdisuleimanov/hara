@@ -291,8 +291,8 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
         : [{ text: `${ctx}${input.text ?? ''}` }];
       u = await hedged(
         (ms) => geminiJson<Understood>({ system: understandPrompt(opts.night), parts, schema: UNDERSTAND_SCHEMA, timeoutMs: ms, temperature: 0.1 }),
-        isAudio ? 7000 : 5000,
-        isAudio ? 2800 : 1600,
+        isAudio ? 6000 : 4200,
+        isAudio ? 2600 : 1500,
       );
     } catch (e) {
       error = e instanceof GeminiError ? e.code : 'UNKNOWN';
@@ -391,7 +391,7 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
 
   let modelReply = '';
   if (!local && useAi) {
-    const left = 10000 - (Date.now() - t0);
+    const left = 9500 - (Date.now() - t0);
     try {
       const request = {
         transcript,
@@ -419,7 +419,7 @@ ${JSON.stringify(request)}` }],
           }
         },
         maxTurns: 3,
-        timeoutMs: Math.max(4000, Math.min(7500, left)),
+        timeoutMs: Math.max(3500, Math.min(6500, left)),
       });
       modelReply = cleanReply(text);
     } catch (e) {
