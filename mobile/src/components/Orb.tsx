@@ -132,16 +132,18 @@ export function Orb({ size = 240, level, active = true, state }: Props) {
               <Stop offset="0.62" stopColor={C.route} stopOpacity={0.16} />
               <Stop offset="1" stopColor={C.route} stopOpacity={0} />
             </RadialGradient>
-            <RadialGradient id={`ha${uid}`} cx="50%" cy="50%" r="50%">
-              <Stop offset="0.35" stopColor={C.ai} stopOpacity={0.55} />
-              <Stop offset="0.65" stopColor={C.ai} stopOpacity={0.14} />
-              <Stop offset="1" stopColor={C.ai} stopOpacity={0} />
-            </RadialGradient>
           </Defs>
           <Circle cx={haloS / 2} cy={haloS / 2} r={haloS / 2} fill={`url(#h${uid})`} />
         </Svg>
         <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, haloAi]}>
           <Svg width={haloS} height={haloS}>
+            <Defs>
+              <RadialGradient id={`ha${uid}`} cx="50%" cy="50%" r="50%">
+                <Stop offset="0.35" stopColor={C.ai} stopOpacity={0.55} />
+                <Stop offset="0.65" stopColor={C.ai} stopOpacity={0.14} />
+                <Stop offset="1" stopColor={C.ai} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
             <Circle cx={haloS / 2} cy={haloS / 2} r={haloS / 2} fill={`url(#ha${uid})`} />
           </Svg>
         </Animated.View>
@@ -164,11 +166,35 @@ export function Orb({ size = 240, level, active = true, state }: Props) {
               <Stop offset="0.45" stopColor={C.brand} />
               <Stop offset="1" stopColor={C.route} />
             </LinearGradient>
-            <LinearGradient id={`ca${uid}`} x1="0.15" y1="0.05" x2="0.9" y2="0.95">
-              <Stop offset="0" stopColor="#B9B9FF" />
-              <Stop offset="0.5" stopColor={C.ai} />
-              <Stop offset="1" stopColor={C.route} />
-            </LinearGradient>
+          </Defs>
+          <Circle cx={R} cy={R} r={R} fill={`url(#c${uid})`} />
+        </Svg>
+        <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, aiLayer]}>
+          <Svg width={core} height={core}>
+            <Defs>
+              <LinearGradient id={`ca${uid}`} x1="0.15" y1="0.05" x2="0.9" y2="0.95">
+                <Stop offset="0" stopColor="#B9B9FF" />
+                <Stop offset="0.5" stopColor={C.ai} />
+                <Stop offset="1" stopColor={C.route} />
+              </LinearGradient>
+            </Defs>
+            <Circle cx={R} cy={R} r={R} fill={`url(#ca${uid})`} />
+          </Svg>
+        </Animated.View>
+
+        {lite ? null : (
+          <>
+            <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: core, height: core }, spinA]}>
+              <DotLayer dots={dotsA} size={core} />
+            </Animated.View>
+            <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: core, height: core }, spinB]}>
+              <DotLayer dots={dotsB} size={core} big />
+            </Animated.View>
+          </>
+        )}
+
+        <Svg width={core} height={core} style={{ position: 'absolute' }}>
+          <Defs>
             <RadialGradient id={`s${uid}`} cx="50%" cy="50%" r="50%">
               <Stop offset="0.62" stopColor="#0F1B2D" stopOpacity={0} />
               <Stop offset="1" stopColor="#0F1B2D" stopOpacity={0.22} />
@@ -178,26 +204,6 @@ export function Orb({ size = 240, level, active = true, state }: Props) {
               <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
             </RadialGradient>
           </Defs>
-          <Circle cx={R} cy={R} r={R} fill={`url(#c${uid})`} />
-        </Svg>
-        <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, aiLayer]}>
-          <Svg width={core} height={core}>
-            <Circle cx={R} cy={R} r={R} fill={`url(#ca${uid})`} />
-          </Svg>
-        </Animated.View>
-
-        {lite ? null : (
-          <>
-            <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: core, height: core }, spinA]} renderToHardwareTextureAndroid>
-              <DotLayer dots={dotsA} size={core} />
-            </Animated.View>
-            <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: core, height: core }, spinB]} renderToHardwareTextureAndroid>
-              <DotLayer dots={dotsB} size={core} big />
-            </Animated.View>
-          </>
-        )}
-
-        <Svg width={core} height={core} style={{ position: 'absolute' }}>
           <Circle cx={R} cy={R} r={R} fill={`url(#s${uid})`} />
           <Circle cx={R} cy={R} r={R} fill={`url(#g${uid})`} />
           <Circle cx={R} cy={R} r={R - 1} fill="none" stroke="#FFFFFF" strokeOpacity={0.35} strokeWidth={1.5} />

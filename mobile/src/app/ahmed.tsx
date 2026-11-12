@@ -19,7 +19,7 @@ import { ChipRow, HandoffCard, ListeningMeter, MicButton, ReplyBubble, StageTrig
 import { Orb, type OrbState } from '@/components/Orb';
 import { CircleButton, Icon, Txt } from '@/components/ui';
 import { PressableScale, SPRING, enter, useTypewriter } from '@/motion';
-import { say, stop, useVoice, VOICE_RECORDING } from '@/voice';
+import { prefetch, say, stop, useVoice, VOICE_RECORDING } from '@/voice';
 import { COMMON } from '@/voice/lines/common';
 import { getWeather } from '@/utils/weather';
 import { log } from '@/utils/log';
@@ -73,6 +73,8 @@ export default function AhmedScreen() {
   const [hint, setHint] = useState<string | null>(null);
 
   const busy = useRef(false);
+  const runId = useRef(0);
+  const ttsReady = useRef<Promise<{ ok: number; failed: number } | null>>(Promise.resolve(null));
   const leaving = useRef(false);
   const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recStart = useRef(0);
@@ -168,29 +170,33 @@ export default function AhmedScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250);
 
     const navigates = r.intent === 'route' && (!!r.liveRouteId || (!!r.destId && !!destById(r.destId)));
-    if (navigates) {
-      // open the cards while Əhməd keeps talking; never wait forever for the voice
-      scheduleOpen(r, 7000);
-      let started = false;
+    const my = runId.current;
+    let started = false;
+    if (navigates) scheduleOpen(r, 8000); // open the cards while Əhməd talks; never wait forever for the voice
+    const speakIt = async () => {
+      // the reply's voice was being prepared while the trace settled; give it a moment more
+      const ready = await Promise.race([ttsReady.current, wait(4200).then(() => null)]);
+      if (my !== runId.current || leaving.current) return;
       say(speakable(r.reply), {
-        maxWaitMs: 6000,
+        live: !!ready?.ok,
+        maxWaitMs: 2500,
         onStart: () => {
           started = true;
-          scheduleOpen(r, 2600);
+          if (navigates && my === runId.current) scheduleOpen(r, 2600);
         },
         onDone: () => {
-          if (!started) scheduleOpen(r, 2200);
+          if (navigates && !started && my === runId.current) scheduleOpen(r, 2200);
         },
       });
-    } else {
-      say(speakable(r.reply), { maxWaitMs: 6000 });
-    }
+    };
+    speakIt();
   };
 
   const transcriptRef = useRef('');
   const run = async (payload: { text?: string; audioB64?: string; mime?: string }, opts: { asVoice?: boolean } = {}) => {
     if (busy.current) return;
     busy.current = true;
+    const my = ++runId.current;
     stop();
     Keyboard.dismiss();
     leaving.current = false;
@@ -211,8 +217,11 @@ export default function AhmedScreen() {
         night,
         asVoice: opts.asVoice,
         history: useAhmedSession.getState().history,
-        onStep: (op) => useAhmedSession.getState().push(op),
+        onStep: (op) => {
+          if (my === runId.current) useAhmedSession.getState().push(op);
+        },
         onTranscript: (tx) => {
+          if (my !== runId.current) return;
           transcriptRef.current = tx;
           setTranscript(tx);
         },
@@ -222,14 +231,18 @@ export default function AhmedScreen() {
       r = { transcript: typedText, destId: null, timeOfDay: null, profile: 'daily', preference: 'safest', companions: [], reply: COMMON.didntHear, source: 'fallback', intent: 'unclear' };
     }
     // stage safety: a failed recording runs the prepared sentence (only when enabled in the hidden panel)
+    if (my !== runId.current) return;
     if (payload.audioB64 && r.intent === 'unclear' && r.error && usePrefs.getState().stageFallback) {
       busy.current = false;
       return run({ text: DEMO_SENTENCE }, { asVoice: true });
     }
+    // start preparing the voice now (clip → cache → live TTS) so it is ready when the answer shows
+    ttsReady.current = prefetch([speakable(r.reply)]).catch(() => ({ ok: 0, failed: 1 }));
     await useAhmedSession.getState().settled();
     const left = MIN_THINK_MS - (Date.now() - started);
     if (left > 0) await wait(left);
     busy.current = false;
+    if (my !== runId.current) return;
     finish(r);
   };
 
@@ -315,6 +328,8 @@ export default function AhmedScreen() {
   };
 
   const cancel = async () => {
+    runId.current++;
+    busy.current = false;
     if (phaseRef.current === 'listening') await stopRecorder();
     orbLevel.value = withSpring(0, SPRING.gentle);
     stop();
