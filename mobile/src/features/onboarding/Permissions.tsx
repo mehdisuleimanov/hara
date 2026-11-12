@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { AudioModule } from 'expo-audio';
-import * as Notifications from 'expo-notifications';
+import { notificationPermission, requestNotificationPermission } from '@/utils/notify';
 import { AhmedAvatar } from '@/components/Brand';
 import { Icon, Txt } from '@/components/ui';
 import { PressableScale, enter } from '@/motion';
@@ -21,13 +21,8 @@ async function micStatus(): Promise<State> {
 }
 
 async function notifStatus(): Promise<State> {
-  if (Platform.OS === 'web') return 'idle';
-  try {
-    const r = await Notifications.getPermissionsAsync();
-    return r.granted ? 'granted' : 'idle';
-  } catch {
-    return 'idle';
-  }
+  const p = await notificationPermission();
+  return p === 'granted' ? 'granted' : 'idle';
 }
 
 export async function askMic(): Promise<State> {
@@ -40,21 +35,7 @@ export async function askMic(): Promise<State> {
 }
 
 export async function askNotifications(): Promise<State> {
-  if (Platform.OS === 'web') return 'denied';
-  try {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('family', {
-        name: 'Ailə',
-        importance: Notifications.AndroidImportance.MAX,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        vibrationPattern: [0, 200, 120, 200],
-      });
-    }
-    const r = await Notifications.requestPermissionsAsync();
-    return r.granted ? 'granted' : 'denied';
-  } catch {
-    return 'denied';
-  }
+  return (await requestNotificationPermission()) ? 'granted' : 'denied';
 }
 
 function PermCard({
