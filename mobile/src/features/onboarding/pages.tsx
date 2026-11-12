@@ -90,8 +90,8 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
 
   return (
     <View style={[styles.page, { width: w }]}>
-      <Animated.View style={[styles.art, art]}>
-        <Glow size={Math.min(w * 0.95, 360)} color="#2FE0C0" intensity={0.5} style={{ bottom: -30 }} />
+      <Animated.View style={[styles.art, { justifyContent: 'center' }, art]}>
+        <Glow size={Math.min(w * 1.05, 400)} color="#2FE0C0" intensity={0.5} style={{ marginTop: 70 }} />
         <Animated.View style={[styles.bubble, bubbleA]}>
           <Txt w="bold" size={15.5} color={C.ink}>
             {shown || ' '}
@@ -99,7 +99,7 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
           <View style={styles.bubbleTail} />
         </Animated.View>
         <Animated.View entering={enter(0, 'pop', 150)}>
-          <OnboardingMascot pose="wave" size={Math.min(w * 0.56, 230)} speaking={voice.speaking} />
+          <OnboardingMascot pose="wave" size={Math.min(w * 0.62, 270)} speaking={voice.speaking} />
         </Animated.View>
       </Animated.View>
       <Copy
