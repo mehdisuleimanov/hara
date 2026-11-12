@@ -139,17 +139,10 @@ export function SimpleHome() {
                     <Txt w="xbold" size={21} numberOfLines={1}>
                       {p.title}
                     </Txt>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                      {sc != null ? (
-                        <View style={[styles.safe, { backgroundColor: t.hc ? C_HC.safe : C.safeSoft }]}>
-                          <Icon name="shield-check" size={15} color={t.hc ? '#FFFFFF' : C.safe} />
-                          <Txt w="bold" size={13} color={t.hc ? '#FFFFFF' : C.safe}>
-                            {sc}
-                          </Txt>
-                        </View>
-                      ) : null}
-                      <Txt w="semi" size={14} color={C.muted} numberOfLines={1}>
-                        {o ? `${o.durationMin} dəq · ${p.sub}` : p.sub}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <Icon name="shield-check" size={18} color={C.safe} />
+                      <Txt w="semi" size={14} color={C.ink2} numberOfLines={2} style={{ flexShrink: 1 }}>
+                        {o ? `${o.durationMin} dəq · ${sc != null && sc >= 75 ? 'ən az riskli yol' : p.sub}` : p.sub}
                       </Txt>
                     </View>
                   </View>

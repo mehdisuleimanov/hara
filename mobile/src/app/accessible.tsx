@@ -196,7 +196,7 @@ export default function Accessible() {
                   </Txt>
                 </View>
               </View>
-              <PillButton label="Bir toxunuşla sifariş et" icon="calendar-check" style={{ marginTop: 14 }} onPress={book} />
+              <PillButton label="Bir toxunuşla sifariş et" icon="calendar-check" variant="black" style={{ marginTop: 14 }} onPress={book} />
             </Animated.View>
           ) : (
             <Animated.View entering={FadeIn.duration(260)} style={{ alignItems: 'center' }}>

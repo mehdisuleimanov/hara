@@ -155,21 +155,21 @@ export default function Report() {
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingHorizontal: 16, paddingBottom: tabSpace + 12 }}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={enter(0)} style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            <Txt v="overline" color={C.muted}>
+        <Animated.View entering={enter(0)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Txt v="overline" color={C.muted} style={{ flex: 1 }}>
               Bildir · şəhəri birlikdə qoruyaq
             </Txt>
-            <Txt v="hero" style={{ marginTop: 6 }} accessibilityRole="header">
-              Nə görürsən?
-            </Txt>
+            <View style={styles.points}>
+              <Icon name="star-four-points" size={15} color={C.brandDark} />
+              <Txt w="bold" size={13} color={C.brandDark}>
+                +10 xal
+              </Txt>
+            </View>
           </View>
-          <View style={styles.points}>
-            <Icon name="star-four-points" size={15} color={C.brandDark} />
-            <Txt w="bold" size={13} color={C.brandDark}>
-              +10 xal
-            </Txt>
-          </View>
+          <Txt v="hero" style={{ marginTop: 6 }} accessibilityRole="header">
+            Nə görürsən?
+          </Txt>
         </Animated.View>
         <Animated.View entering={enter(1)}>
           <Txt w="med" size={15} color={C.ink2} style={{ marginTop: 8 }}>
@@ -254,8 +254,10 @@ export default function Report() {
 
         {/* nearby */}
         <Animated.View entering={enter(10)} style={{ marginTop: 24 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <Txt v="h3">Yaxınlıqda son bildirişlər</Txt>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+            <Txt v="h3" style={{ flex: 1 }}>
+              Yaxınlıqda son bildirişlər
+            </Txt>
             <PressableScale scaleTo={0.94} accessibilityRole="button" onPress={() => router.navigate('/map')} style={styles.all}>
               <Txt w="semi" size={13}>
                 Xəritə
@@ -264,6 +266,16 @@ export default function Report() {
             </PressableScale>
           </View>
           <View style={{ gap: 8 }}>
+            {nearby.length === 0 ? (
+              <View style={[styles.near, border]}>
+                <View style={[styles.nearIcon, { backgroundColor: C.safeSoft }]}>
+                  <Icon name="shield-check-outline" size={20} color={C.safe} />
+                </View>
+                <Txt w="semi" size={14} color={C.ink2} style={{ flex: 1 }}>
+                  Yaxınlıqda açıq bildiriş yoxdur. Nəsə görsən, ilk sən xəbər ver.
+                </Txt>
+              </View>
+            ) : null}
             {nearby.map((r) => {
               const m = REPORT_META[r.category];
               const danger = m.tone === 'danger';
@@ -402,7 +414,7 @@ export default function Report() {
 }
 
 const styles = StyleSheet.create({
-  points: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.brandSoft, borderRadius: R.pill, paddingHorizontal: 12, height: 34, marginTop: 2 },
+  points: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.brandSoft, borderRadius: R.pill, paddingHorizontal: 12, height: 32 },
   camera: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.navy, borderRadius: R.lg, padding: 14 },
   camDisc: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
   camArrow: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },

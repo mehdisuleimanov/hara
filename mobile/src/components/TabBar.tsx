@@ -19,7 +19,7 @@ type Slot =
 
 /** 5 slots: two tabs · central "Bildir" action · Əhməd shortcut · profile. */
 const SLOTS: Slot[] = [
-  { kind: 'tab', name: 'index', icon: 'home-variant-outline', iconOn: 'home-variant', label: 'Ana' },
+  { kind: 'tab', name: 'index', icon: 'home-variant-outline', iconOn: 'home-variant', label: 'Əsas' },
   { kind: 'tab', name: 'map', icon: 'map-outline', iconOn: 'map', label: 'Xəritə' },
   { kind: 'center', name: 'report', icon: 'plus', label: 'Bildir' },
   { kind: 'ahmed', label: 'Əhməd' },
