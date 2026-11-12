@@ -1,0 +1,248 @@
+{
+  "source": "gemini",
+  "model": "gemini-3.1-flash-lite",
+  "specVersion": 2,
+  "generated": "2026-11-12T22:15:36.985Z",
+  "samples": {
+    "signal": {
+      "is_street_scene": true,
+      "crossing_type": "zebra",
+      "pedestrian_signal": false,
+      "vehicle_signal": false,
+      "lanes_to_cross": 4,
+      "median_refuge": false,
+      "street_lighting": true,
+      "sidewalk": "good",
+      "grade_access": "at_grade",
+      "step_free": "yes",
+      "speed_context": "urban_street",
+      "parked_cars_block_view": false,
+      "pedestrians_in_traffic": false,
+      "boxes": [
+        {
+          "label": "crosswalk",
+          "box_2d": [
+            755,
+            0,
+            815,
+            145
+          ]
+        },
+        {
+          "label": "crossing_sign",
+          "box_2d": [
+            587,
+            228,
+            642,
+            255
+          ]
+        },
+        {
+          "label": "crossing_sign",
+          "box_2d": [
+            577,
+            456,
+            641,
+            497
+          ]
+        },
+        {
+          "label": "pedestrian",
+          "box_2d": [
+            714,
+            236,
+            827,
+            270
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            705,
+            345,
+            808,
+            489
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            716,
+            134,
+            814,
+            303
+          ]
+        },
+        {
+          "label": "street_light",
+          "box_2d": [
+            348,
+            56,
+            757,
+            126
+          ]
+        }
+      ],
+      "summary_az": "Burada avtomobil sıxlığı yüksəkdir və işıqfor yoxdur. Yolu keçərkən diqqətli ol, sürücülərin səni gördüyündən əmin ol və tələsmədən hərəkət et.",
+      "_model": "gemini-3.1-flash-lite",
+      "_latencyMs": 2695
+    },
+    "unmarked": {
+      "is_street_scene": true,
+      "crossing_type": "none",
+      "pedestrian_signal": false,
+      "vehicle_signal": false,
+      "lanes_to_cross": 6,
+      "median_refuge": false,
+      "street_lighting": true,
+      "sidewalk": "none",
+      "grade_access": "unknown",
+      "step_free": "unknown",
+      "speed_context": "urban_arterial",
+      "parked_cars_block_view": false,
+      "pedestrians_in_traffic": true,
+      "boxes": [
+        {
+          "label": "pedestrian",
+          "box_2d": [
+            452,
+            153,
+            566,
+            187
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            453,
+            30,
+            501,
+            145
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            458,
+            339,
+            501,
+            441
+          ]
+        },
+        {
+          "label": "bus",
+          "box_2d": [
+            430,
+            872,
+            496,
+            942
+          ]
+        },
+        {
+          "label": "street_light",
+          "box_2d": [
+            188,
+            441,
+            478,
+            457
+          ]
+        },
+        {
+          "label": "street_light",
+          "box_2d": [
+            279,
+            814,
+            465,
+            841
+          ]
+        }
+      ],
+      "summary_az": "Burada piyada keçidi yoxdur və avtomobillər çox sürətlə hərəkət edir. Yolu keçmək üçün mütləq yaxınlıqdakı yeraltı keçiddən istifadə et və ehtiyatlı ol.",
+      "_model": "gemini-3.1-flash-lite",
+      "_latencyMs": 2103
+    },
+    "underpass": {
+      "is_street_scene": true,
+      "crossing_type": "underpass",
+      "pedestrian_signal": false,
+      "vehicle_signal": true,
+      "lanes_to_cross": 4,
+      "median_refuge": false,
+      "street_lighting": false,
+      "sidewalk": "good",
+      "grade_access": "escalator",
+      "step_free": "no",
+      "speed_context": "urban_arterial",
+      "parked_cars_block_view": false,
+      "pedestrians_in_traffic": false,
+      "boxes": [
+        {
+          "label": "escalator",
+          "box_2d": [
+            445,
+            350,
+            1000,
+            1000
+          ]
+        },
+        {
+          "label": "pedestrian",
+          "box_2d": [
+            404,
+            737,
+            694,
+            861
+          ]
+        },
+        {
+          "label": "bus",
+          "box_2d": [
+            98,
+            603,
+            313,
+            1000
+          ]
+        },
+        {
+          "label": "traffic_light",
+          "box_2d": [
+            0,
+            569,
+            52,
+            587
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            207,
+            440,
+            261,
+            583
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            218,
+            66,
+            332,
+            276
+          ]
+        },
+        {
+          "label": "car",
+          "box_2d": [
+            202,
+            243,
+            251,
+            353
+          ]
+        }
+      ],
+      "summary_az": "Burada əsas risk eskalatorun əlil arabası üçün uyğun olmamasıdır. Yolu keçmək üçün mütləq bu yeraltı keçiddən istifadə et və ehtiyatlı ol.",
+      "_model": "gemini-3.1-flash-lite",
+      "_latencyMs": 2528
+    }
+  }
+}

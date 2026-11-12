@@ -1,0 +1,179 @@
+import React, { memo, useEffect, useMemo } from 'react';
+import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  ZoomIn,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Svg, { Line, Path } from 'react-native-svg';
+import { BOX_LABEL_AZ, type BoxLabel, type VisionBox } from '@/ai/vision';
+import { Txt } from '@/components/ui';
+import { C } from '@/theme';
+import { prefs } from '@/store/prefs';
+
+export const BOX_STAGGER = 190;
+
+/** Box colors: blue = people, amber = vehicles, green = protective infrastructure, white = context. */
+export function boxColor(l: BoxLabel) {
+  if (l === 'pedestrian') return C.route;
+  if (l === 'car' || l === 'bus') return C.warn;
+  if (l === 'street_light' || l === 'bollard' || l === 'lane_marking') return '#FFFFFF';
+  return C.brand;
+}
+
+/** Thin scanning grid + viewfinder corners (static SVG, drawn once). */
+const Grid = memo(function Grid({ w, h }: { w: number; h: number }) {
+  const step = 36;
+  const lines = [];
+  for (let x = step; x < w; x += step) lines.push(<Line key={`x${x}`} x1={x} y1={0} x2={x} y2={h} stroke="#FFFFFF" strokeOpacity={0.1} strokeWidth={1} />);
+  for (let y = step; y < h; y += step) lines.push(<Line key={`y${y}`} x1={0} y1={y} x2={w} y2={y} stroke="#FFFFFF" strokeOpacity={0.1} strokeWidth={1} />);
+  return (
+    <Svg width={w} height={h} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {lines}
+    </Svg>
+  );
+});
+
+export const Corners = memo(function Corners({ w, h, inset = 16, len = 26, color = '#FFFFFF' }: { w: number; h: number; inset?: number; len?: number; color?: string }) {
+  const a = inset, b = w - inset, c = h - inset;
+  const d = `M${a} ${a + len} L${a} ${a} L${a + len} ${a} M${b - len} ${a} L${b} ${a} L${b} ${a + len} M${b} ${c - len} L${b} ${c} L${b - len} ${c} M${a + len} ${c} L${a} ${c} L${a} ${c - len}`;
+  return (
+    <Svg width={w} height={h} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Path d={d} stroke={color} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+});
+
+/** Gradient bar sweeping over the frozen frame while the model looks at it. */
+function Beam({ h, active }: { h: number; active: boolean }) {
+  const y = useSharedValue(0);
+  useEffect(() => {
+    if (active && !prefs().liteFx) {
+      y.value = 0;
+      y.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.quad) }), -1, true);
+    } else cancelAnimation(y);
+    return () => cancelAnimation(y);
+  }, [active, y]);
+  const st = useAnimatedStyle(() => ({ transform: [{ translateY: -70 + y.value * (h - 20) }] }));
+  if (!active) return null;
+  return (
+    <Animated.View pointerEvents="none" exiting={FadeOut.duration(220)} style={[{ position: 'absolute', left: 0, right: 0, top: 0, height: 90 }, st]}>
+      <LinearGradient colors={['rgba(91,91,246,0)', 'rgba(91,91,246,0.38)', 'rgba(91,91,246,0)']} style={{ flex: 1 }} />
+      <View style={{ position: 'absolute', left: 0, right: 0, top: 44, height: 2, backgroundColor: '#B9B9FF' }} />
+    </Animated.View>
+  );
+}
+
+function BoxView({ b, i, w, h, iw, ih, base }: { b: VisionBox; i: number; w: number; h: number; iw: number; ih: number; base: number }) {
+  // resizeMode="cover" math: the image is scaled to fill w×h and centered
+  const s = Math.max(w / iw, h / ih);
+  const dw = iw * s, dh = ih * s;
+  const ox = (w - dw) / 2, oy = (h - dh) / 2;
+  const [y0, x0, y1, x1] = b.box_2d;
+  let left = ox + (x0 / 1000) * dw;
+  let top = oy + (y0 / 1000) * dh;
+  let right = ox + (x1 / 1000) * dw;
+  let bottom = oy + (y1 / 1000) * dh;
+  left = Math.max(2, left);
+  top = Math.max(2, top);
+  right = Math.min(w - 2, right);
+  bottom = Math.min(h - 2, bottom);
+  const bw = right - left, bh = bottom - top;
+  if (bw < 6 || bh < 6) return null;
+  const col = boxColor(b.label);
+  const dark = col === '#FFFFFF';
+  const labelAbove = top > 26;
+  const lite = prefs().liteFx;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      entering={lite ? FadeIn.duration(120).delay(base + i * 80) : ZoomIn.springify().damping(13).stiffness(210).delay(base + i * BOX_STAGGER)}
+      style={{ position: 'absolute', left, top, width: bw, height: bh }}
+    >
+      <View style={{ flex: 1, borderWidth: 2, borderColor: col, borderRadius: 8, backgroundColor: col === '#FFFFFF' ? 'rgba(255,255,255,0.08)' : `${col}1F` }} />
+      <View
+        style={{
+          position: 'absolute',
+          left: -1,
+          ...(labelAbove ? { top: -24 } : { top: 3, left: 3 }),
+          paddingHorizontal: 8,
+          height: 21,
+          borderRadius: 7,
+          backgroundColor: col,
+          justifyContent: 'center',
+        }}
+      >
+        <Txt w="bold" size={11} color={dark ? C.navy : '#FFFFFF'} numberOfLines={1}>
+          {BOX_LABEL_AZ[b.label]}
+        </Txt>
+      </View>
+    </Animated.View>
+  );
+}
+
+/**
+ * The frozen frame: photo + grid + sweeping beam while scanning, then the detected
+ * objects pop in one by one with a light haptic tick each.
+ */
+export function Stage({
+  source,
+  iw,
+  ih,
+  w,
+  h,
+  phase,
+  boxes,
+}: {
+  source: ImageSourcePropType;
+  iw: number;
+  ih: number;
+  w: number;
+  h: number;
+  phase: 'scan' | 'done' | 'guide';
+  boxes: VisionBox[];
+}) {
+  const shown = phase === 'done' ? boxes : [];
+  // biggest boxes first so small ones end up on top
+  const ordered = useMemo(
+    () => shown.map((b, i) => ({ b, i })).sort((p, q) => (q.b.box_2d[2] - q.b.box_2d[0]) * (q.b.box_2d[3] - q.b.box_2d[1]) - (p.b.box_2d[2] - p.b.box_2d[0]) * (p.b.box_2d[3] - p.b.box_2d[1])),
+    [shown],
+  );
+  useEffect(() => {
+    if (phase !== 'done' || !boxes.length) return;
+    const step = prefs().liteFx ? 80 : BOX_STAGGER;
+    const timers = boxes.map((_, i) => setTimeout(() => Haptics.selectionAsync().catch(() => {}), 120 + i * step));
+    return () => timers.forEach(clearTimeout);
+  }, [phase, boxes]);
+
+  const dim = useSharedValue(0);
+  useEffect(() => {
+    dim.value = withTiming(phase === 'scan' ? 0.32 : phase === 'guide' ? 0.5 : 0.08, { duration: 360 });
+  }, [phase, dim]);
+  const dimStyle = useAnimatedStyle(() => ({ opacity: dim.value }));
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Image source={source} resizeMode="cover" style={StyleSheet.absoluteFill} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: C.navy }, dimStyle]} />
+      {phase === 'scan' ? (
+        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(250)} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Grid w={w} h={h} />
+        </Animated.View>
+      ) : null}
+      <Beam h={h} active={phase === 'scan'} />
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {ordered.map(({ b, i }) => (
+          <BoxView key={`${i}-${b.label}`} b={b} i={i} w={w} h={h} iw={iw} ih={ih} base={120} />
+        ))}
+      </View>
+    </View>
+  );
+}

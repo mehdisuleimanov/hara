@@ -1,0 +1,177 @@
+{
+  "version": 2,
+  "system": "You are a road-safety auditor trained in the iRAP (International Road Assessment Programme) pedestrian Star Rating method. You look at ONE street-level photo, usually from Baku, Azerbaijan, and code only what is actually visible. Be conservative: when an attribute is not clearly visible, answer false or \"unknown\" instead of guessing. Bounding boxes: box_2d = [ymin, xmin, ymax, xmax], integers normalized to 0-1000 of the full image. Return at most 8 boxes, most safety-relevant first: the crossing facility itself (zebra markings, underpass entrance, footbridge), pedestrian and vehicle signals, pedestrians, the vehicles nearest to the crossing, median or refuge island, stairs / escalator / ramp / lift, street lights. Each box must tightly cover one clearly visible object; never box empty road. summary_az: one or two short sentences (at most 28 words) in natural, fluent Azerbaijani (Latin script) as a friendly local guide named Əhməd would say them out loud. Always use the informal singular \"sən\" forms (keç, istifadə et, diqqət et, gözlə) and never \"siz\" forms (keçin, çəkinin, edin). First name the main risk you actually see (for example the number of lanes, missing signal, a person standing in traffic, stairs without a lift), then the one most useful action. Do not call any place \"təhlükəsiz\"; when comparing say \"ən az riskli\". No emoji, no markdown.",
+  "prompt": "Code the pedestrian crossing situation in this photo with the iRAP-style attributes in the schema. lanes_to_cross = traffic lanes of the road a pedestrian has to cross here, both directions together (estimate from lane markings, vehicle rows and road width; for an underpass or footbridge count the lanes of the road it passes under or over).",
+  "schema": {
+    "type": "OBJECT",
+    "properties": {
+      "is_street_scene": {
+        "type": "BOOLEAN",
+        "description": "true if the photo shows a street, road or pedestrian crossing environment"
+      },
+      "crossing_type": {
+        "type": "STRING",
+        "enum": [
+          "signalized",
+          "zebra",
+          "unmarked",
+          "underpass",
+          "footbridge",
+          "none"
+        ],
+        "description": "signalized = crossing controlled by traffic lights; zebra = painted crossing without lights; unmarked = people cross a road with no markings; underpass/footbridge = grade-separated; none = no crossing situation"
+      },
+      "pedestrian_signal": {
+        "type": "BOOLEAN",
+        "description": "a pedestrian traffic light (walking figure) is visible"
+      },
+      "vehicle_signal": {
+        "type": "BOOLEAN",
+        "description": "a vehicle traffic light is visible"
+      },
+      "lanes_to_cross": {
+        "type": "INTEGER",
+        "description": "0-10"
+      },
+      "median_refuge": {
+        "type": "BOOLEAN",
+        "description": "a raised median or pedestrian refuge island splits the crossing"
+      },
+      "street_lighting": {
+        "type": "BOOLEAN",
+        "description": "street lamps are visible near the crossing"
+      },
+      "sidewalk": {
+        "type": "STRING",
+        "enum": [
+          "good",
+          "poor",
+          "none",
+          "unknown"
+        ]
+      },
+      "grade_access": {
+        "type": "STRING",
+        "enum": [
+          "at_grade",
+          "stairs",
+          "escalator",
+          "lift",
+          "ramp",
+          "unknown"
+        ],
+        "description": "how a pedestrian reaches the crossing level; at_grade for surface crossings"
+      },
+      "step_free": {
+        "type": "STRING",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ],
+        "description": "a wheelchair or stroller user can cross without steps (curb ramps, lift or ramp)"
+      },
+      "speed_context": {
+        "type": "STRING",
+        "enum": [
+          "residential",
+          "urban_street",
+          "urban_arterial",
+          "highway"
+        ]
+      },
+      "parked_cars_block_view": {
+        "type": "BOOLEAN",
+        "description": "parked vehicles hide pedestrians from drivers at the crossing"
+      },
+      "pedestrians_in_traffic": {
+        "type": "BOOLEAN",
+        "description": "a pedestrian is standing or walking on the carriageway outside a marked crossing"
+      },
+      "boxes": {
+        "type": "ARRAY",
+        "maxItems": 8,
+        "items": {
+          "type": "OBJECT",
+          "properties": {
+            "label": {
+              "type": "STRING",
+              "enum": [
+                "crosswalk",
+                "pedestrian_signal",
+                "traffic_light",
+                "pedestrian",
+                "car",
+                "bus",
+                "median",
+                "street_light",
+                "crossing_sign",
+                "stairs",
+                "escalator",
+                "ramp",
+                "lift",
+                "underpass_entrance",
+                "footbridge",
+                "bollard",
+                "lane_marking"
+              ]
+            },
+            "box_2d": {
+              "type": "ARRAY",
+              "items": {
+                "type": "INTEGER"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            }
+          },
+          "required": [
+            "label",
+            "box_2d"
+          ],
+          "propertyOrdering": [
+            "label",
+            "box_2d"
+          ]
+        }
+      },
+      "summary_az": {
+        "type": "STRING"
+      }
+    },
+    "required": [
+      "is_street_scene",
+      "crossing_type",
+      "pedestrian_signal",
+      "vehicle_signal",
+      "lanes_to_cross",
+      "median_refuge",
+      "street_lighting",
+      "sidewalk",
+      "grade_access",
+      "step_free",
+      "speed_context",
+      "parked_cars_block_view",
+      "pedestrians_in_traffic",
+      "boxes",
+      "summary_az"
+    ],
+    "propertyOrdering": [
+      "is_street_scene",
+      "crossing_type",
+      "pedestrian_signal",
+      "vehicle_signal",
+      "lanes_to_cross",
+      "median_refuge",
+      "street_lighting",
+      "sidewalk",
+      "grade_access",
+      "step_free",
+      "speed_context",
+      "parked_cars_block_view",
+      "pedestrians_in_traffic",
+      "boxes",
+      "summary_az"
+    ]
+  }
+}
