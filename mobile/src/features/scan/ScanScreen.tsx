@@ -173,7 +173,7 @@ export function ScanScreen() {
       if (!f) {
         setFrame(null);
       }
-      const weak = e instanceof GeminiError && (e.code === 'OFFLINE' || e.code === 'TIMEOUT' || e.code === 'NO_KEY' || e.code === 'HTTP_5XX');
+      const weak = e instanceof GeminiError && (e.code === 'OFFLINE' || e.code === 'TIMEOUT' || e.code === 'NO_KEY' || e.code === 'HTTP_5XX' || e.status === 429);
       showGuide(my, weak ? SCAN.weak : SCAN.unclear);
     } finally {
       setBusy(false);
