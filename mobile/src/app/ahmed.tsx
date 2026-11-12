@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { AudioModule, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { askAhmed, AHMED_SAY, DEMO_SENTENCE, speakable } from '@/ai/ahmed';
+import { askAhmed, AHMED_SAY, DEMO_SENTENCE, scriptedReply, speakable } from '@/ai/ahmed';
 import { useAppStore, useIsNight, type AhmedResult } from '@/store/useAppStore';
 import { usePrefs } from '@/store/prefs';
 import { useAhmedSession } from '@/store/ahmedSession';
@@ -343,6 +343,9 @@ export default function AhmedScreen() {
   };
 
   const close = () => {
+    runId.current++;
+    leaving.current = true;
+    if (handoffTimer.current) clearTimeout(handoffTimer.current);
     stop();
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -390,7 +393,16 @@ export default function AhmedScreen() {
     const out: Suggestion[] = [];
     if (result.intent === 'question') {
       const d = result.destId ? destById(result.destId) : null;
-      if (d) out.push({ label: `${d.short} — marşrut`, icon: 'map-marker-path', onPress: () => openRoute({ ...result, intent: 'route' }) });
+      if (d)
+        out.push({
+          label: `${d.short} — marşrut`,
+          icon: 'map-marker-path',
+          onPress: () => {
+            const routed: AhmedResult = { ...result, intent: 'route', preference: 'safest', reply: scriptedReply(d.id, 'safest', result.timeOfDay ? result.timeOfDay === 'night' : night) };
+            setLastAhmed(routed);
+            openRoute(routed);
+          },
+        });
       const tx = result.transcript.replace(/\?+$/, '');
       if (/gecə/i.test(tx)) out.push({ label: 'Bəs gündüz?', icon: 'white-balance-sunny', onPress: () => run({ text: `${tx.replace(/gecə/gi, 'gündüz')}?` }) });
       else out.push({ label: 'Bəs gecə?', icon: 'weather-night', onPress: () => run({ text: `Gecə ${tx.charAt(0).toLowerCase()}${tx.slice(1)}?` }) });
