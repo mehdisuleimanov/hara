@@ -1,7 +1,11 @@
-import { DESTINATIONS } from '@/data/destinations';
-import type { Profile, RouteKind, TimeOfDay } from '@/data/types';
+/**
+ * Offline understanding for Əhməd (no network, no React Native imports — also used by
+ * scripts/gen-voice.ts through script.ts). Relative imports on purpose.
+ */
+import { DESTINATIONS } from '../data/destinations';
+import type { Profile, RouteKind, TimeOfDay } from '../data/types';
 
-/** Scripted demo sentence used by the hidden demo button and when audio can't be understood. */
+/** Hidden stage sentence (double long-press on Əhməd, /ahmed?demo=1, stage fallback). */
 export const DEMO_SENTENCE = 'Gecədir, uşaq arabası ilə 28 May metrosundan Hilton-a getmək istəyirəm';
 
 export function norm(s: string) {
@@ -15,7 +19,7 @@ export function norm(s: string) {
     .replace(/ş/g, 's')
     .replace(/ç/g, 'c')
     .replace(/ğ/g, 'g')
-    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/[^a-z0-9? ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -26,18 +30,22 @@ export type Intent = {
   profile: Profile;
   preference: RouteKind;
   companions: string[];
+  /** route request vs. a free question ("Gecə Nizami təhlükəsizdir?") */
+  kind: 'route' | 'question' | 'unclear';
 };
 
-/** Keyword matcher — works offline. */
+const MOTION = [' get', ' gedim', ' gedirem', ' gedir', ' apar', ' catim', ' catmaq', ' yol ', ' yolu', ' yolla', ' marsrut', ' isteyirem', ' lazimdir'];
+const QUESTION = ['?', ' mi ', ' mu ', ' nece', ' necedir', ' tehlukesiz', ' tehlukeli', ' riskli', ' nedir', ' hansi', ' varmi', ' olar ', ' neyse', ' isiqfor', ' kecid'];
+
+/** Keyword matcher — works offline. "28 May" is always the origin, never the destination. */
 export function matchIntent(text: string): Intent {
-  const t = ' ' + norm(text) + ' ';
+  const t = ' ' + norm(text).replace(/\b28 ?may\w*/g, ' ') + ' ';
   let destId: string | null = null;
   let best = 0;
   for (const d of DESTINATIONS) {
     for (const a of [d.name, d.short, ...d.aliases]) {
       const na = norm(a);
       if (na.length >= 2 && t.includes(' ' + na) && na.length > best) {
-        // ignore the origin metro mention ("28 May-dan")
         destId = d.id;
         best = na.length;
       }
@@ -56,11 +64,18 @@ export function matchIntent(text: string): Intent {
 
   let preference: RouteKind = 'safest';
   if (has('ucuz', 'serfeli', 'qenaet', 'pulsuz')) preference = 'cheapest';
-  if (has('tez ', 'suretli', 'telesir', 'gecikir')) preference = 'fastest';
+  if (has(' tez ', 'suretli', 'telesir', 'gecikir')) preference = 'fastest';
 
   let timeOfDay: TimeOfDay | null = null;
   if (has('gece', 'axsam', 'qaranliq')) timeOfDay = 'night';
   else if (has('gunduz', 'seher', 'gunorta')) timeOfDay = 'day';
 
-  return { destId, timeOfDay, profile, preference, companions };
+  const asks = has(...QUESTION);
+  const moves = has(...MOTION) || preference !== 'safest';
+  let kind: Intent['kind'] = 'unclear';
+  if (asks && !moves) kind = 'question';
+  else if (destId) kind = 'route';
+  else if (asks) kind = 'question';
+
+  return { destId, timeOfDay, profile, preference, companions, kind };
 }
