@@ -16,6 +16,8 @@ type Layer = {
   stations: { name: string; lat: number; lon: number }[];
   /** street names referenced by CrossingT[7] */
   names?: string[];
+  /** metro tunnel geometry per consecutive station pair, key "A|B" (line order), flat [lat,lon,...] */
+  metroHops?: Record<string, number[]>;
 };
 
 /**
@@ -39,6 +41,9 @@ export const LAYER = {
   },
   get names(): string[] {
     return load().names ?? [];
+  },
+  get metroHops(): Record<string, number[]> {
+    return load().metroHops ?? {};
   },
 };
 

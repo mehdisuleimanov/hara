@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { routeToCore } from '../src/features/routing/liveCore.ts';
-import { scoreWalk } from '../src/features/routing/scoring.ts';
+import { scoreWalk, capByModes } from '../src/features/routing/scoring.ts';
 import { ORIGIN } from '../src/data/destinations.ts';
 
 const layer = JSON.parse(await fs.readFile(path.resolve('src/data/safety-layer.json'), 'utf8'));
@@ -22,7 +22,7 @@ const fetchJson = async (url, timeoutMs, headers) => {
 const query = process.argv[2] ?? 'Fəvvarələr meydanı';
 const time = process.argv[3] === 'night' ? 'night' : 'day';
 const t0 = Date.now();
-const r = await routeToCore({ query }, { time }, { fetchJson, layer, stations: layer.stations, scoreWalk, origin: ORIGIN, log: (...a) => console.log('  log:', ...a.map(String)) });
+const r = await routeToCore({ query }, { time }, { fetchJson, layer, stations: layer.stations, metroHops: layer.metroHops, scoreWalk, capByModes, origin: ORIGIN, log: (...a) => console.log('  log:', ...a.map(String)) });
 console.log(`"${query}" (${time}) → ${Date.now() - t0} ms`);
 if (!r) {
   console.log('null');

@@ -53,6 +53,7 @@
 //   names:     street names referenced by crossings[7] (−1 = unnamed)
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { loadMetroGraph, RED, GREEN, findStation } from './lib/metro.mjs';
 import { F, DEFAULT_SPEED, T_SIGNALS, T_ZEBRA, T_UNMARKED, T_GRADE, crossingScore } from './lib/irap.mjs';
 
 const CACHE = path.resolve('scripts/.cache');
@@ -381,13 +382,29 @@ async function main() {
     for (const c of crossings) b[c[i] >= 75 ? 0 : c[i] >= 55 ? 1 : 2]++;
     return `≥75 ${b[0]} · 55–74 ${b[1]} · <55 ${b[2]}`;
   };
-  const out = { v: 2, generated: new Date().toISOString(), model: 'hara-irap-lite-1', crossings, segments, stations, names };
+  // metro tunnel geometry per consecutive station pair (on-device live routing draws real tunnels)
+  const metroHops = {};
+  const graph = await loadMetroGraph();
+  let hopsReal = 0;
+  if (graph) {
+    for (const line of [RED, GREEN]) {
+      for (let i = 1; i < line.length; i++) {
+        const a = findStation(stations, line[i - 1]), b = findStation(stations, line[i]);
+        if (!a || !b) continue;
+        const h = graph.hop(a, b);
+        if (!h) continue;
+        metroHops[`${line[i - 1]}|${line[i]}`] = simplify(h.pts.map(([lat, lon]) => ({ lat, lon })), 3).flatMap((p) => [r5(p.lat), r5(p.lon)]);
+        hopsReal++;
+      }
+    }
+  }
+  const out = { v: 2, generated: new Date().toISOString(), model: 'hara-irap-lite-1', crossings, segments, stations, names, metroHops };
   await fs.writeFile(OUT, JSON.stringify(out));
   const size = (await fs.stat(OUT)).size;
   console.log(`crossings: ${crossings.length} (signals ${counts[0]}, zebra ${counts[1]}, unmarked ${counts[2]}, grade-separated ${counts[3]}); footway=crossing: +${added} new, ${upgraded} tags filled`);
   console.log(`  day:   ${band(3)}\n  night: ${band(4)}`);
   console.log(`  evidence: lanes defaulted ${stat.lanesDefault}, lit unknown ${stat.litUnknown}, bus stop ${stat.bus}, school ${stat.school}, isolated ${stat.isolated}, island ${stat.island}`);
-  console.log(`segments: ${segments.length}, stations: ${stations.length}, names: ${names.length}`);
+  console.log(`segments: ${segments.length}, stations: ${stations.length}, names: ${names.length}, metro hops with tunnel geometry: ${hopsReal}`);
   console.log(`wrote ${OUT} (${(size / 1024 / 1024).toFixed(2)} MB)`);
 }
 

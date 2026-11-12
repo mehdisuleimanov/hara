@@ -17,6 +17,10 @@
  *              − 3 per additional high-risk (<55) crossing, max −12
  *   no walk  = 92 day / 90 night (metro stations are lit and staffed)
  * Clamped to [5, 97]. Day and night are computed independently from the layer's d/n values.
+ *
+ * Option-level caps (capByModes): the walk score says nothing about time spent in road traffic,
+ * so trips with a road-vehicle leg are capped — taxi 78 day / 70 night (car-occupant road risk,
+ * kerbside boarding), bus 86 / 74 (waiting at stops). Metro adds no cap.
  */
 import type { CrossingT, SegmentT } from '../../data/layer';
 
@@ -50,6 +54,23 @@ export const SCORE_MODEL = {
   repeatPenalty: 3,
   repeatCap: 12,
 };
+
+export const MODE_CAP: Record<string, { day: number; night: number }> = {
+  taxi: { day: 78, night: 70 },
+  bus: { day: 86, night: 74 },
+};
+
+/** Apply road-vehicle caps for the modes used by an option; keeps night ≤ day. */
+export function capByModes<T extends { day: number; night: number }>(s: T, modes: string[]): T {
+  let day = s.day, night = s.night;
+  for (const m of modes) {
+    const c = MODE_CAP[m];
+    if (!c) continue;
+    day = Math.min(day, c.day);
+    night = Math.min(night, c.night);
+  }
+  return { ...s, day, night: Math.min(night, day) };
+}
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 const M_LAT = 110540;

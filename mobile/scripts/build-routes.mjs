@@ -22,7 +22,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ORIGIN, DESTINATIONS } from '../src/data/destinations.ts';
-import { scoreWalk } from '../src/features/routing/scoring.ts';
+import { scoreWalk, capByModes } from '../src/features/routing/scoring.ts';
 import { osrm } from './lib/osrm.mjs';
 import { loadMetroGraph } from './lib/metro.mjs';
 import { crossingScore, T_UNMARKED, DEFAULT_SPEED } from './lib/irap.mjs';
@@ -422,7 +422,7 @@ async function main() {
     o._s = s;
     return o;
   }
-  const walkScore = (legs, extra) => score(legs.filter((l) => l.mode === 'walk' && !l.indoor).map((l) => flat(l.pts)), extra);
+  const walkScore = (legs, extra) => capByModes(score(legs.filter((l) => l.mode === 'walk' && !l.indoor).map((l) => flat(l.pts)), extra), legs.map((l) => l.mode));
   const crossingWords = (s) => {
     const parts = [];
     if (s.signals) parts.push(`${s.signals} işıqforlu/yeraltı keçid`);

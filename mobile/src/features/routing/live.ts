@@ -2,7 +2,7 @@ import type { Profile, RouteOption, TimeOfDay } from '@/data/types';
 import { LAYER } from '@/data/layer';
 import { ORIGIN } from '@/data/destinations';
 import { log } from '@/utils/log';
-import { scoreWalk } from './scoring';
+import { capByModes, scoreWalk } from './scoring';
 import { routeToCore, type FetchJson, type LiveDeps } from './liveCore';
 
 /**
@@ -39,7 +39,7 @@ const fetchJson: FetchJson = async (url, timeoutMs, headers) => {
 
 let deps: LiveDeps | null = null;
 function getDeps(): LiveDeps {
-  if (!deps) deps = { fetchJson, layer: LAYER, stations: LAYER.stations, scoreWalk, origin: ORIGIN, log };
+  if (!deps) deps = { fetchJson, layer: LAYER, stations: LAYER.stations, metroHops: LAYER.metroHops, scoreWalk, capByModes, origin: ORIGIN, log };
   return deps;
 }
 

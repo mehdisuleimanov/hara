@@ -5,9 +5,9 @@
  *  geocode  Photon (komoot) biased to Baku → Nominatim fallback (Baku viewbox, bounded=1,
  *           generic User-Agent, no personal data). Only results inside the Baku bbox count.
  *  route    FOSSGIS OSRM (routing.openstreetmap.de) foot + car from the origin pin.
- *  options  safest  = lowest-risk of {OSRM foot alternatives, metro + best walk}
- *           cheapest= shortest walk (≤3 km) or metro trip (0,60 ₼)
- *           fastest = taxi (OSRM car) + foot connectors
+ *  options  candidates: lowest-risk walk, shortest walk (≤3 km), metro + best walk, taxi.
+ *           Titles come from the data: safest = best score for the time of day (taxi capped by
+ *           capByModes), fastest only if quicker than the safest, cheapest only if it costs less.
  *  scores   scoreWalk() — the same weakest-link model as the catalog (scoring.ts).
  *  tariffs  walk = OSRM foot × 1.1 · metro 3 min wait + 2.2 min/hop (+3 transfer), 0,60 ₼ ·
  *           taxi = OSRM car × 1.3 + 3 min pickup, 2.4 + 0.85 ₼/km (±1 ₼) ·
@@ -27,7 +27,11 @@ export type LiveDeps = {
   layer: LayerData;
   stations: { name: string; lat: number; lon: number }[];
   scoreWalk: (layer: LayerData, walks: number[][]) => WalkScore;
+  /** road-vehicle caps (scoring.ts capByModes) */
+  capByModes?: <T extends { day: number; night: number }>(s: T, modes: string[]) => T;
   origin: { lat: number; lon: number; name: string };
+  /** tunnel geometry per consecutive station pair ("A|B" in line order); straight hops when missing */
+  metroHops?: Record<string, number[]>;
   log?: (...a: unknown[]) => void;
 };
 
@@ -204,7 +208,17 @@ function metroLegs(deps: LiveDeps, from: string, to: string): { legs: Leg[]; hop
     if (names.length < 2) continue;
     const sts = names.map((n) => stationOf(deps, n)).filter((s): s is { name: string; lat: number; lon: number } => !!s);
     if (sts.length !== names.length) return null;
-    const pts = sts.map((s) => [s.lat, s.lon] as P);
+    const pts: P[] = [[sts[0].lat, sts[0].lon]];
+    for (let i = 1; i < sts.length; i++) {
+      const fwd = deps.metroHops?.[`${names[i - 1]}|${names[i]}`];
+      const rev = deps.metroHops?.[`${names[i]}|${names[i - 1]}`];
+      const hop: P[] = [];
+      const src = fwd ?? rev;
+      if (src) for (let k = 0; k < src.length; k += 2) hop.push([src[k], src[k + 1]]);
+      if (rev && !fwd) hop.reverse();
+      // interior tunnel points only; station coordinates stay the anchors
+      pts.push(...hop.slice(1, -1), [sts[i].lat, sts[i].lon]);
+    }
     if (legs.length) {
       const prev = legs[legs.length - 1];
       const a: P = [prev.c[prev.c.length - 2], prev.c[prev.c.length - 1]];
@@ -297,7 +311,6 @@ export async function buildOptions(id: string, place: LivePlace, deps: LiveDeps,
   ]);
   const walks = footR.status === 'fulfilled' ? footR.value : [];
 
-  const drafts: { d: Draft; s: WalkScore }[] = [];
   // walking options
   const walkScored = walks.map((t) => {
     const legs = [walkLeg(t, speed)];
@@ -349,13 +362,17 @@ export async function buildOptions(id: string, place: LivePlace, deps: LiveDeps,
     }
   }
 
-  // safest = best of walks + metro
-  const walkCands = walkScored.filter((w) => w.t.distance <= 4500);
-  const bestWalk = [...walkCands].sort((a, b) => key(b.s) - key(a.s) || a.t.distance - b.t.distance)[0];
-  const shortest = [...walkScored].sort((a, b) => a.t.distance - b.t.distance)[0];
-  const walkDraft = (w: (typeof walkScored)[number], kind: RouteOption['kind']): { d: Draft; s: WalkScore } => ({
+  // ── candidates (each can be presented under any title; titles are assigned from the data below)
+  type Cand = { build: (kind: RouteOption['kind']) => Draft; s: WalkScore; price: number; minutes: number; walkOnly: boolean; walkM: number };
+  const cands: Cand[] = [];
+  const minutesOf = (legs: Leg[]) => legs.reduce((a, l) => a + l.durationMin, 0);
+  const walkCand = (w: (typeof walkScored)[number]): Cand => ({
     s: w.s,
-    d: {
+    price: 0,
+    minutes: minutesOf(w.legs),
+    walkOnly: true,
+    walkM: w.t.distance,
+    build: (kind) => ({
       kind,
       legs: w.legs,
       steps: stepsFor(w.legs, [w.t]),
@@ -364,18 +381,20 @@ export async function buildOptions(id: string, place: LivePlace, deps: LiveDeps,
         kind === 'safest'
           ? [crossingWords(w.s), 'Ən az riskli piyada xətti', `${round10(w.t.distance)} m piyada`]
           : ['Pulsuz, birbaşa piyada', `${round10(w.t.distance)} m`],
-      warning: kind === 'cheapest' && w.s.unsignalized ? `${w.s.unsignalized} işıqforsuz keçid${(night ? w.s.riskyNight : w.s.riskyDay) ? ' · riskli keçid var' : ''}` : undefined,
-    },
+      warning: kind !== 'safest' && w.s.unsignalized ? `${w.s.unsignalized} işıqforsuz keçid${(night ? w.s.riskyNight : w.s.riskyDay) ? ' · riskli keçid var' : ''}` : undefined,
+    }),
   });
-  let safest: { d: Draft; s: WalkScore } | null = bestWalk ? walkDraft(bestWalk, 'safest') : null;
-  if (metroDraft && (!safest || key(metroDraft.s) >= key(safest.s))) safest = metroDraft;
-  if (safest) drafts.push(safest);
+  const walkCands = walkScored.filter((w) => w.t.distance <= 4500);
+  const bestWalk = [...walkCands].sort((a, b) => key(b.s) - key(a.s) || a.t.distance - b.t.distance)[0];
+  const shortest = [...walkScored].filter((w) => w.t.distance <= 3000).sort((a, b) => a.t.distance - b.t.distance)[0];
+  if (bestWalk) cands.push(walkCand(bestWalk));
+  if (shortest && shortest !== bestWalk) cands.push(walkCand(shortest));
+  if (metroDraft) {
+    const md = metroDraft;
+    cands.push({ s: md.s, price: 0.6, minutes: minutesOf(md.d.legs), walkOnly: false, walkM: 0, build: (kind) => ({ ...md.d, kind }) });
+  }
 
-  // cheapest = shortest walk ≤3 km (else the metro trip when it isn't already the safest)
-  if (shortest && shortest.t.distance <= 3000) drafts.push(walkDraft(shortest, 'cheapest'));
-  else if (metroDraft && safest !== metroDraft) drafts.push({ s: metroDraft.s, d: { ...metroDraft.d, kind: 'cheapest' } });
-
-  // fastest = taxi
+  // taxi
   if (carR.status === 'fulfilled' && carR.value.length) {
     const car = carR.value[0];
     const legs: Leg[] = [];
@@ -393,29 +412,45 @@ export async function buildOptions(id: string, place: LivePlace, deps: LiveDeps,
       legs.push({ mode: 'walk', c: flat(densify3([drop, D])), distanceM: Math.round(hav(drop, D)), durationMin: r1(hav(drop, D) / WALK_M_PER_MIN / speed) });
       tracks.push(null);
     }
-    const s = score(legs);
-    drafts.push({
+    const s = deps.capByModes ? deps.capByModes(score(legs), ['taxi']) : score(legs);
+    const steps = stepsFor(legs, tracks);
+    cands.push({
       s,
-      d: {
-        kind: 'fastest',
+      price: lo,
+      minutes: minutesOf(legs),
+      walkOnly: false,
+      walkM: 0,
+      build: (kind) => ({
+        kind,
         legs,
-        steps: stepsFor(legs, tracks),
+        steps,
         price: `${lo}–${lo + 2} ₼`,
         reasons: ['Qapıdan qapıya ən az piyada', 'Qiymət tarif modeli ilə təxminidir'],
         warning: s.unsignalized ? `${s.unsignalized} işıqforsuz keçid piyada hissədə` : undefined,
-      },
+      }),
     });
   }
+  if (!cands.length) return [];
 
-  const options = drafts.map(({ d, s }) => finalize(id, d, s));
+  // ── titles from the data: safest = best score for the time of day; fastest only if it is
+  //    quicker than the safest; cheapest only if it costs less (or is a quicker free walk)
+  const safest = [...cands].sort((a, b) => key(b.s) - key(a.s) || a.price - b.price || a.minutes - b.minutes)[0];
+  const rest = cands.filter((c) => c !== safest);
+  const fastest = [...rest].sort((a, b) => a.minutes - b.minutes)[0];
+  const picked: { c: Cand; kind: RouteOption['kind'] }[] = [{ c: safest, kind: 'safest' }];
+  const useFast = fastest && fastest.minutes < safest.minutes - 0.5 ? fastest : null;
+  // a free walk over 3 km is not a sensible "cheapest" offer when a 0,60 ₼ metro exists
+  const cheap = rest.filter((c) => c !== useFast && !(c.walkOnly && c.walkM > 3000 && rest.some((x) => x.price > 0 && x.price < 1))).sort((a, b) => a.price - b.price || a.minutes - b.minutes)[0];
+  if (cheap && (cheap.price < safest.price || (cheap.price === safest.price && cheap.minutes < safest.minutes - 1))) picked.push({ c: cheap, kind: 'cheapest' });
+  if (useFast) picked.push({ c: useFast, kind: 'fastest' });
+
+  const options = picked.map(({ c, kind }) => finalize(id, c.build(kind), c.s));
   // never show the same line twice
   const out: RouteOption[] = [];
   for (const o of options) if (!out.some((x) => sameGeometry(x, o))) out.push(o);
-  const safe = out.find((o) => o.kind === 'safest');
-  if (safe) {
-    const worst = Math.max(0, ...out.filter((o) => o !== safe).map((o) => o.unsignalized));
-    safe.avoided = Math.max(0, worst - safe.unsignalized);
-  }
+  const safe = out[0];
+  const worst = Math.max(0, ...out.filter((o) => o !== safe).map((o) => o.unsignalized));
+  safe.avoided = Math.max(0, worst - safe.unsignalized);
   return out;
 }
 

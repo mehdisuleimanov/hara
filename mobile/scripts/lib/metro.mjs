@@ -6,6 +6,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const FILE = path.resolve('scripts/.cache/metro.json');
+
+/** Baku Metro line orders (canonical names; matched to OSM station names with normName). */
+export const RED = ['İçərişəhər', 'Sahil', '28 May', 'Gənclik', 'Nəriman Nərimanov', 'Ulduz', 'Koroğlu', 'Qara Qarayev', 'Neftçilər', 'Xalqlar Dostluğu', 'Əhmədli', 'Həzi Aslanov'];
+export const GREEN = ['Xətai', 'Cəfər Cabbarlı', 'Nizami', 'Elmlər Akademiyası', 'İnşaatçılar', '20 Yanvar', 'Memar Əcəmi', 'Nəsimi', 'Azadlıq prospekti', 'Dərnəgül'];
+export const normName = (s) => s.toLowerCase().replace(/ə/g, 'e').replace(/ı/g, 'i').replace(/i̇/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/[^a-z0-9]/g, '');
+export function findStation(stations, name) {
+  const n = normName(name);
+  return stations.find((s) => normName(s.name) === n) ?? stations.find((s) => normName(s.name).includes(n) || n.includes(normName(s.name)));
+}
 const SNAP_M = 250;
 const MAX_RATIO = 1.6;
 
