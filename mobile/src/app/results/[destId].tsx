@@ -13,6 +13,7 @@ import { optionsFor, ROUTES, summary } from '@/data/routes';
 import type { Destination, LatLng, RouteKind, RouteOption } from '@/data/types';
 import { liveRouteById, type LiveRoute } from '@/features/routing/live';
 import { useMapLook } from '@/components/mapStyle';
+import { speakable } from '@/ai/script';
 import { MeArrow, PinView } from '@/components/RouteLines';
 import { bestOption, cardTitle, RouteCard } from '@/components/RouteCard';
 import { CircleButton, Icon, Txt, tap } from '@/components/ui';
@@ -138,7 +139,7 @@ function ResultsView({
   const best = bestOption(options, night) ?? options[0];
   const recommended: RouteKind = best.kind;
   const [selected, setSelected] = useState<RouteKind>(() => {
-    const k = kind && kind !== 'safest' ? kind : best.kind;
+    const k = kind ?? best.kind;
     return options.some((o) => o.kind === k) ? k : options[0].kind;
   });
   const opt = options.find((o) => o.kind === selected) ?? options[0];
@@ -170,7 +171,7 @@ function ResultsView({
   // speak the reply on open (?speak=1); ?speak=0 or absent stays quiet
   useEffect(() => {
     if (speak !== '1') return;
-    const t = setTimeout(() => say(reply), 650);
+    const t = setTimeout(() => say(speakable(reply)), 650);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -358,7 +359,7 @@ function ResultsView({
   };
   const playReply = () => {
     if (voice.speaking) stop();
-    else say(reply);
+    else say(speakable(reply));
   };
   const pick = (k: RouteKind) => {
     if (k !== selected) setSelected(k);
