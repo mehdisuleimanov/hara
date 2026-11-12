@@ -1,52 +1,134 @@
-import React from 'react';
-import { View } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
+import React, { memo, useEffect, useMemo } from 'react';
+import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { C } from '@/theme';
+import { useFx } from '@/hooks/useTheme';
+import { useVoice } from '@/voice';
+import {
+  AVATAR_BG,
+  AVATAR_NAME,
+  MASCOT,
+  PIVOT,
+  VB_FULL,
+  VB_HEAD,
+  avatarArt,
+  mascotBack,
+  mascotEyes,
+  mascotGlow,
+  mascotHead,
+  mascotWaveArm,
+  type Mood,
+  type Shape,
+  type Who,
+} from '@/features/brand/art';
 import { Txt } from './ui';
 import { LOGO_PATHS, LOGO_RATIO, LOGO_VIEWBOX } from './logoPaths';
 
 /**
- * Brand marks drawn as SVG from the team's references:
- *  - Əhməd: turquoise pin mascot with a navy flat cap (user's mascot image)
- *  - "hara" logo: the team's own SVG (assets/brand/hara-logo.svg), transparent background
+ * Brand marks, drawn from the team's own art:
+ *  - "hara" logo: the team's SVG (assets/brand/hara-logo.svg), background removed (logoPaths.ts)
+ *  - Əhməd: turquoise pin mascot with a navy flat cap (features/brand/art.ts)
+ *  - people avatars: Aysel, Murad, Nənə in the same flat style
  */
 
-const PIN = 'M50 4C26.8 4 8 22.4 8 45.2c0 27.6 33.3 59.6 39.1 64.9a4.3 4.3 0 0 0 5.8 0C58.7 104.8 92 72.8 92 45.2 92 22.4 73.2 4 50 4Z';
+export type AhmedMood = Mood;
+export type AvatarWho = Who;
 
-/** Colors sampled from the mascot artwork. */
-const MASCOT = {
-  bodyTop: '#45E0C3',
-  bodyBottom: '#1FC2A5',
-  limb: '#27C9AC',
-  cap: '#1D2536',
-  capBrim: '#262F45',
-  face: '#101521',
-  cheek: '#7FEBD5',
-  glow: '#2FE0C0',
-};
+let reduceMotion = false;
+AccessibilityInfo.isReduceMotionEnabled?.()
+  .then((v) => (reduceMotion = !!v))
+  .catch(() => {});
 
-export function LogoMark({ size = 36, color = C.route }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size * 1.15} viewBox="0 0 100 115">
-      <Path d={PIN} fill={color} />
-      <SvgText x="50" y="64" fontSize="54" fontWeight="900" fill="#FFFFFF" textAnchor="middle">
-        ?
-      </SvgText>
-    </Svg>
-  );
+/* ------------------------------------------------------------------ shapes → svg */
+
+function renderShapes(shapes: Shape[], k = 's'): React.ReactNode[] {
+  return shapes.map((s, i) => {
+    const key = `${k}${i}`;
+    switch (s.t) {
+      case 'g':
+        return (
+          <G key={key} transform={s.tf} opacity={s.op}>
+            {renderShapes(s.c, key)}
+          </G>
+        );
+      case 'path':
+        return (
+          <Path
+            key={key}
+            d={s.d}
+            fill={s.fill ?? 'none'}
+            stroke={s.stroke}
+            strokeWidth={s.sw}
+            strokeLinecap={s.stroke ? 'round' : undefined}
+            strokeLinejoin={s.stroke ? 'round' : undefined}
+            opacity={s.op}
+            transform={s.tf}
+          />
+        );
+      case 'ellipse':
+        return <Ellipse key={key} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} fill={s.fill} opacity={s.op} transform={s.tf} />;
+      case 'circle':
+        return <Circle key={key} cx={s.cx} cy={s.cy} r={s.r} fill={s.fill} opacity={s.op} />;
+    }
+  });
 }
 
+/** One static SVG layer — memoized so animations (UI thread) never re-render it. */
+const Layer = memo(function Layer({ shapes, vb, w, h, body }: { shapes: Shape[]; vb: string; w: number; h: number; body?: boolean }) {
+  return (
+    <Svg width={w} height={h} viewBox={vb} style={{ position: 'absolute', left: 0, top: 0 }}>
+      {body ? (
+        <Defs>
+          <LinearGradient id="ahmedBody" x1="0.2" y1="0" x2="0.8" y2="1">
+            <Stop offset="0" stopColor={MASCOT.bodyTop} />
+            <Stop offset="1" stopColor={MASCOT.bodyBottom} />
+          </LinearGradient>
+        </Defs>
+      ) : null}
+      {renderShapes(shapes)}
+    </Svg>
+  );
+});
+
+/* ------------------------------------------------------------------ logo */
+
 /**
- * "hara" logo — the team's original artwork (assets/brand/hara-logo.svg) with the navy
- * background removed, so it sits on any surface. Paths are generated into logoPaths.ts.
+ * "hara" logo — the team's original artwork with the navy background removed, so it sits on
+ * any surface. `mono` paints every path one color (white on dark, single-color contexts).
  */
-export const HaraWordmark = React.memo(function HaraWordmark({ width = 120 }: { width?: number }) {
+export const HaraWordmark = memo(function HaraWordmark({ width = 120, mono }: { width?: number; mono?: string }) {
   return (
     <Svg width={width} height={width * LOGO_RATIO} viewBox={LOGO_VIEWBOX} accessibilityLabel="hara" accessibilityRole="image">
       {LOGO_PATHS.map((p, i) => (
-        <Path key={i} d={p.d} fill={p.fill} />
+        <Path key={i} d={p.d} fill={mono ?? p.fill} />
       ))}
     </Svg>
+  );
+});
+
+/** Navy app tile with the mint wordmark — identical to the launcher icon. */
+export const LogoMark = memo(function LogoMark({ size = 36, color = '#071532', style }: { size?: number; color?: string; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View
+      accessibilityLabel="Hara"
+      style={[
+        { width: size, height: size, borderRadius: size * 0.26, backgroundColor: color, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+        style,
+      ]}
+    >
+      <HaraWordmark width={size * 0.78} />
+    </View>
   );
 });
 
@@ -54,107 +136,225 @@ export function Logo({ size = 30 }: { size?: number; dark?: boolean }) {
   return <HaraWordmark width={size * 4} />;
 }
 
+/* ------------------------------------------------------------------ Əhməd */
+
+function parseVb(vb: string) {
+  const [x, y, w, h] = vb.split(' ').map(Number);
+  return { x, y, w, h };
+}
+
+/** Squash a layer around a horizontal line (px from the view's top) — blink / talking mouth. */
+function squashAround(s: number, lineY: number, h: number) {
+  'worklet';
+  return [{ translateY: (lineY - h / 2) * (1 - s) }, { scaleY: s }];
+}
+
+function BlinkEyes({ shapes, vb, w, h, eyeY, enabled }: { shapes: Shape[]; vb: string; w: number; h: number; eyeY: number; enabled: boolean }) {
+  const lid = useSharedValue(1);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    let t: ReturnType<typeof setTimeout>;
+    const next = () => {
+      t = setTimeout(() => {
+        if (!alive) return;
+        const twice = Math.random() < 0.22;
+        const close = withTiming(0.08, { duration: 70, easing: Easing.in(Easing.quad) });
+        const open = withTiming(1, { duration: 120, easing: Easing.out(Easing.quad) });
+        lid.value = twice ? withSequence(close, open, close, open) : withSequence(close, open);
+        next();
+      }, 3000 + Math.random() * 3000);
+    };
+    next();
+    return () => {
+      alive = false;
+      clearTimeout(t);
+      cancelAnimation(lid);
+    };
+  }, [enabled, lid]);
+  const a = useAnimatedStyle(() => ({ transform: squashAround(lid.value, eyeY, h) }));
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, width: w, height: h }, a]}>
+      <Layer shapes={shapes} vb={vb} w={w} h={h} />
+    </Animated.View>
+  );
+}
+
+const MOUTH_SMILE: Shape[] = [
+  { t: 'g', tf: 'translate(20 6)', c: [{ t: 'path', d: 'M43 69 c 4 5.5 12 5.5 16 0', stroke: MASCOT.face, sw: 3.2, fill: 'none' }] },
+];
+const MOUTH_OPEN: Shape[] = [
+  {
+    t: 'g',
+    tf: 'translate(20 6)',
+    c: [
+      { t: 'ellipse', cx: 51, cy: 71.5, rx: 5.8, ry: 5.4, fill: MASCOT.face },
+      { t: 'ellipse', cx: 51, cy: 74.6, rx: 3.4, ry: 1.9, fill: MASCOT.tongue },
+    ],
+  },
+];
+
+/** Mouth driven by Əhməd's voice level (0..1): smile at rest, opens with the voice. */
+function TalkMouth({ vb, w, h, mouthY }: { vb: string; w: number; h: number; mouthY: number }) {
+  const { level } = useVoice();
+  return <TalkMouthLevel level={level} vb={vb} w={w} h={h} mouthY={mouthY} />;
+}
+
+function TalkMouthLevel({ level, vb, w, h, mouthY }: { level: SharedValue<number>; vb: string; w: number; h: number; mouthY: number }) {
+  const open = useAnimatedStyle(() => {
+    const s = interpolate(level.value, [0, 0.12, 1], [0.05, 0.35, 1], 'clamp');
+    return { opacity: level.value > 0.04 ? 1 : 0, transform: squashAround(s, mouthY, h) };
+  });
+  const rest = useAnimatedStyle(() => ({ opacity: level.value > 0.04 ? 0 : 1 }));
+  return (
+    <>
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, width: w, height: h }, rest]}>
+        <Layer shapes={MOUTH_SMILE} vb={vb} w={w} h={h} />
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, width: w, height: h }, open]}>
+        <Layer shapes={MOUTH_OPEN} vb={vb} w={w} h={h} />
+      </Animated.View>
+    </>
+  );
+}
+
+/** Full-body limbs are static here (the animated full-body rig lives in features/mascot). */
+const BACK = [...mascotBack(), ...mascotWaveArm()];
+const GLOW = mascotGlow();
+
+/** Gentle idle bob (opt-in via `bob`). */
+function Bob({ amp, children, style }: { amp: number; children: React.ReactNode; style: StyleProp<ViewStyle> }) {
+  const v = useSharedValue(0);
+  const { lite } = useFx();
+  useEffect(() => {
+    if (lite || reduceMotion) return;
+    v.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 1300, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(v);
+  }, [lite, v]);
+  const a = useAnimatedStyle(() => ({ transform: [{ translateY: -amp * v.value }, { scaleY: 1 + 0.012 * v.value }] }));
+  return <Animated.View style={[style, a]}>{children}</Animated.View>;
+}
+
 /**
- * Əhməd — the AI guide. `full` draws the whole character (arms, legs, waving hand, glow)
- * like the mascot artwork; the default is the head-only pin for small avatars.
+ * Əhməd — the AI companion. `full` draws the whole (static) character with the raised hand;
+ * the default is the head-only pin for small avatars.
+ * - `mood`: smile | talk | think | alert | wave (face expression)
+ * - `blink`: natural random blink (default on for size ≥ 40)
+ * - `speaking`: mouth follows Əhməd's voice level (useVoice)
+ * - `bob`: gentle idle float (opt-in)
  */
-export function AhmedAvatar({
+export const AhmedAvatar = memo(function AhmedAvatar({
   size = 64,
   mood = 'smile',
   full = false,
   glow = full,
+  blink,
+  speaking = false,
+  bob,
+  style,
 }: {
   size?: number;
-  mood?: 'smile' | 'talk';
+  mood?: AhmedMood;
   full?: boolean;
   glow?: boolean;
+  blink?: boolean;
+  speaking?: boolean;
+  bob?: boolean;
+  style?: StyleProp<ViewStyle>;
 }) {
-  const vb = full ? '0 0 140 150' : '20 4 100 116';
-  const ratio = full ? 150 / 140 : 116 / 100;
-  return (
-    <Svg width={size} height={size * ratio} viewBox={vb} accessibilityLabel="Əhməd">
-      <Defs>
-        <LinearGradient id="ahmedBody" x1="0.2" y1="0" x2="0.8" y2="1">
-          <Stop offset="0" stopColor={MASCOT.bodyTop} />
-          <Stop offset="1" stopColor={MASCOT.bodyBottom} />
-        </LinearGradient>
-      </Defs>
-      {glow ? (
-        <>
-          <Circle cx="70" cy="70" r="68" fill={MASCOT.glow} opacity={0.10} />
-          <Circle cx="70" cy="66" r="56" fill={MASCOT.glow} opacity={0.14} />
-        </>
-      ) : null}
+  const vb = full ? VB_FULL : VB_HEAD;
+  const box = parseVb(vb);
+  const w = size;
+  const h = (size * box.h) / box.w;
+  const k = size / box.w;
+  const doBlink = blink ?? size >= 40;
+  const doBob = !!bob && size >= 40;
+  const m: Mood = mood;
 
-      {full ? (
-        <>
-          {/* short legs + round feet (behind body) */}
-          <Path d="M62 108 L 61 130" stroke={MASCOT.limb} strokeWidth={11} strokeLinecap="round" />
-          <Path d="M79 108 L 80 130" stroke={MASCOT.limb} strokeWidth={11} strokeLinecap="round" />
-          <Ellipse cx="58" cy="136" rx="11.5" ry="7" fill={MASCOT.limb} />
-          <Ellipse cx="83" cy="136" rx="11.5" ry="7" fill={MASCOT.limb} />
-          {/* left arm hanging, mitten hand */}
-          <Path d="M34 76 Q 22 88 24 104" stroke={MASCOT.limb} strokeWidth={11} strokeLinecap="round" fill="none" />
-          <Ellipse cx="24" cy="107" rx="7.5" ry="8.5" fill={MASCOT.limb} />
-          {/* right arm raised, waving open hand (4 fingers) */}
-          <Path d="M104 74 Q 120 68 122 46" stroke={MASCOT.limb} strokeWidth={11} strokeLinecap="round" fill="none" />
-          <Ellipse cx="123" cy="38" rx="10" ry="11" fill={MASCOT.limb} />
-          <Ellipse cx="114.5" cy="27" rx="3.6" ry="7" fill={MASCOT.limb} transform="rotate(-18 114.5 27)" />
-          <Ellipse cx="122" cy="24" rx="3.6" ry="7.5" fill={MASCOT.limb} transform="rotate(-4 122 24)" />
-          <Ellipse cx="129.5" cy="26" rx="3.6" ry="7" fill={MASCOT.limb} transform="rotate(12 129.5 26)" />
-          <Ellipse cx="134.5" cy="35" rx="3.3" ry="6" fill={MASCOT.limb} transform="rotate(48 134.5 35)" />
-        </>
-      ) : null}
+  const head = useMemo(() => mascotHead(m, { withMouth: !speaking, withEyes: !doBlink }), [m, speaking, doBlink]);
+  const eyes = useMemo(() => mascotEyes(m), [m]);
+  const eyeY = (PIVOT.eyes.y - box.y) * k;
+  const mouthY = (PIVOT.mouth.y - box.y) * k;
 
-      <G transform="translate(20 6)">
-        {/* body (teal pin, soft vertical shading) */}
-        <Path d={PIN} fill="url(#ahmedBody)" />
-        <Path d="M22 30 C 26 20 36 14 46 13" stroke="#FFFFFF" strokeOpacity={0.25} strokeWidth={4} strokeLinecap="round" fill="none" />
-        {/* big flat cap: dome over the top + brim out to the right */}
-        <Path d="M7 42 C 4 18 26 0 52 0 C 77 0 94 13 95 31 C 81 25 65 23 50 24 C 33 25 17 31 7 42 Z" fill={MASCOT.cap} />
-        <Path d="M58 30 C 74 23 96 22 103 31 C 98 39 80 39 61 36 Z" fill={MASCOT.capBrim} />
-        <Path d="M16 30 C 24 14 40 6 56 6" stroke="#FFFFFF" strokeOpacity={0.10} strokeWidth={4} strokeLinecap="round" fill="none" />
-        {/* thick eyebrows */}
-        <Path d="M28 42 q 8 -6 15 -2" stroke={MASCOT.face} strokeWidth={3.6} strokeLinecap="round" fill="none" />
-        <Path d="M57 40 q 8 -4 15 2" stroke={MASCOT.face} strokeWidth={3.6} strokeLinecap="round" fill="none" />
-        {/* big eyes, pupils looking up-left, glints */}
-        <Ellipse cx="38" cy="55" rx="8.8" ry="10.5" fill="#FFFFFF" />
-        <Ellipse cx="63" cy="55" rx="8.8" ry="10.5" fill="#FFFFFF" />
-        <Circle cx="37" cy="55.5" r="5.4" fill={MASCOT.face} />
-        <Circle cx="61.8" cy="55.5" r="5.4" fill={MASCOT.face} />
-        <Circle cx="38.8" cy="52.6" r="1.9" fill="#FFFFFF" />
-        <Circle cx="63.6" cy="52.6" r="1.9" fill="#FFFFFF" />
-        {/* cheeks */}
-        <Ellipse cx="25" cy="69" rx="7.5" ry="5" fill={MASCOT.cheek} opacity={0.75} />
-        <Ellipse cx="76" cy="69" rx="7.5" ry="5" fill={MASCOT.cheek} opacity={0.75} />
-        {/* small smile */}
-        {mood === 'talk' ? (
-          <Ellipse cx="51" cy="71" rx="5.5" ry="4.4" fill={MASCOT.face} />
-        ) : (
-          <Path d="M43 69 c 4 5.5 12 5.5 16 0" stroke={MASCOT.face} strokeWidth={3.2} strokeLinecap="round" fill="none" />
-        )}
-      </G>
-    </Svg>
+  const content = (
+    <>
+      {full || glow ? <Layer shapes={full ? [...(glow ? GLOW : []), ...BACK] : GLOW} vb={vb} w={w} h={h} /> : null}
+      <Layer shapes={head} vb={vb} w={w} h={h} body />
+      {doBlink ? <BlinkEyes shapes={eyes} vb={vb} w={w} h={h} eyeY={eyeY} enabled={!reduceMotion} /> : null}
+      {speaking ? <TalkMouth vb={vb} w={w} h={h} mouthY={mouthY} /> : null}
+    </>
   );
-}
 
-export function Avatar({ size = 52, initials = 'A' }: { size?: number; initials?: string }) {
+  const boxStyle: StyleProp<ViewStyle> = [{ width: w, height: h }, style];
   return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: C.brandSoft,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: '#FFFFFF',
-      }}
-    >
-      <Txt w="xbold" size={size * 0.38} color={C.brandDark}>
-        {initials}
-      </Txt>
+    <View accessible accessibilityRole="image" accessibilityLabel="Əhməd" style={boxStyle}>
+      {doBob ? (
+        <Bob amp={size * 0.035} style={{ width: w, height: h }}>
+          {content}
+        </Bob>
+      ) : (
+        content
+      )}
     </View>
   );
-}
+});
+
+/* ------------------------------------------------------------------ people */
+
+const INITIAL_WHO: Record<string, Who> = { A: 'aysel', M: 'murad', N: 'nene' };
+
+/**
+ * Illustrated person avatar (flat style matching Əhməd). `who` picks the person; the default is
+ * Aysel (the app's user). Unknown initials fall back to a soft monogram.
+ */
+export const Avatar = memo(function Avatar({
+  size = 52,
+  initials,
+  who,
+  ring = '#FFFFFF',
+  style,
+}: {
+  size?: number;
+  initials?: string;
+  who?: Who;
+  ring?: string | null;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const person: Who | null = who ?? (initials ? INITIAL_WHO[initials.toUpperCase()] ?? null : 'aysel');
+  const shapes = useMemo(() => (person ? avatarArt(person) : []), [person]);
+  const frame: ViewStyle = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: person ? AVATAR_BG[person] : C.brandSoft,
+    borderWidth: ring ? Math.max(2, size * 0.04) : 0,
+    borderColor: ring ?? undefined,
+  };
+  if (!person) {
+    return (
+      <View style={[frame, style]}>
+        <Txt w="xbold" size={size * 0.38} color={C.brandDark}>
+          {initials}
+        </Txt>
+      </View>
+    );
+  }
+  const inner = size - (ring ? Math.max(2, size * 0.04) * 2 : 0);
+  return (
+    <View accessible accessibilityRole="image" accessibilityLabel={AVATAR_NAME[person]} style={[frame, style]}>
+      <Svg width={inner} height={inner} viewBox="0 0 100 100">
+        {renderShapes(shapes)}
+      </Svg>
+    </View>
+  );
+});

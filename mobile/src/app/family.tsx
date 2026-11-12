@@ -1,19 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming, cancelAnimation } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '@/store/useAppStore';
 import { ROUTES } from '@/data/routes';
-import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
-import { IconPin } from '@/components/RouteLines';
+import { MAP_STYLE } from '@/components/mapStyle';
 import { AhmedAvatar, Avatar } from '@/components/Brand';
+import { FamilyMascot } from '@/features/brand/FamilyMascot';
+import { TopScrim } from '@/features/brand/TopScrim';
 import { ScoreRing } from '@/components/ScoreRing';
-import { CircleButton, Heading, Icon, PillButton, Tag, Txt } from '@/components/ui';
+import { Burst, Pop, Pulse } from '@/components/anim';
+import { CircleButton, Icon, PillButton, Tag, Txt } from '@/components/ui';
+import { PressableScale, SPRING, enter } from '@/motion';
 import { makeTrack, pointAt, regionFor, toLatLngs } from '@/utils/geo';
 import { triggerFamilyArrival } from '@/utils/notify';
+import { say } from '@/voice';
+import { BRAND } from '@/voice/lines/brand';
+import { useMarkerSnapshot } from '@/features/brand/useMarkerSnapshot';
 import { C, R, shadow } from '@/theme';
 
 const PRICE = '3,99 ₼';
@@ -23,91 +30,177 @@ export default function Family() {
   return subscribed ? <Dashboard /> : <Paywall />;
 }
 
+/* ------------------------------------------------------------------ paywall */
+
+const FEATURES = [
+  { icon: 'school-outline', t: 'Uşağın məktəb yolu', s: 'Marşrutda işıqforsuz keçid olmur' },
+  { icon: 'bell-ring-outline', t: 'Çatanda bildiriş', s: 'Məktəbə, evə çatdı — dərhal xəbərin olur' },
+  { icon: 'human-cane', t: 'Yaşlıların səfəri', s: 'Nənə yolda olanda canlı izlə' },
+  { icon: 'weather-night', t: 'Gecə səfərini paylaş', s: 'Ailən canlı yerini görür' },
+  { icon: 'shield-alert-outline', t: 'SOS', s: 'Bir hərəkətlə ailəyə canlı yer' },
+];
+
 function Paywall() {
   const insets = useSafeAreaInsets();
   const setSubscribed = useAppStore((s) => s.setFamilySubscribed);
   const showToast = useAppStore((s) => s.showToast);
   const [paying, setPaying] = useState(false);
-  const FEATURES = [
-    { icon: 'school-outline', t: 'Uşağın məktəb yolu', s: 'Marşrutda işıqforsuz keçid olmur' },
-    { icon: 'bell-ring-outline', t: 'Çatanda bildiriş', s: 'Məktəbə, evə çatdı — dərhal xəbər' },
-    { icon: 'human-cane', t: 'Yaşlıların səfəri', s: 'Nənə-baba səfərdə olanda izlə' },
-    { icon: 'weather-night', t: 'Gecə səfərini paylaş', s: 'Ailə canlı yeri görür' },
-    { icon: 'shield-alert-outline', t: 'SOS düyməsi', s: 'Bir toxunuşla ailəyə canlı yer' },
-  ];
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <LinearGradient colors={[C.purple, '#D6E6FF']} style={[styles.hero, { paddingTop: insets.top + 8 }]}>
-          <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 18 }}>
-            <View style={{ flex: 1 }}>
-              <Tag label="PREMIUM" bg="rgba(255,255,255,0.25)" color={C.ink} />
-              <Heading light="Hara" bold="Ailə" size={40} color={C.ink} style={{ marginTop: 10 }} />
-              <Txt w="semi" size={16} color={C.muted} style={{ marginTop: 6 }}>
-                Sevdiklərinin yolu da{'\n'}ən az riskli olsun
-              </Txt>
-            </View>
-            <AhmedAvatar size={100} full />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 28 }} showsVerticalScrollIndicator={false}>
+        <LinearGradient colors={['#EEEEFF', '#F2F7FF', '#FFFFFF']} locations={[0, 0.6, 1]} style={[styles.hero, { paddingTop: insets.top + 8 }]}>
+          <CircleButton icon="chevron-left" size={48} bg="rgba(255,255,255,0.8)" onPress={() => router.back()} />
+          <View style={styles.cluster}>
+            <Animated.View entering={enter(0, 'pop', 80)} style={[styles.clusterItem, { left: 0, top: 46 }]}>
+              <Avatar who="nene" size={74} />
+            </Animated.View>
+            <Animated.View entering={enter(1, 'pop', 80)} style={[styles.clusterItem, { left: 56, top: 8 }]}>
+              <Avatar who="aysel" size={86} />
+            </Animated.View>
+            <Animated.View entering={enter(2, 'pop', 80)} style={[styles.clusterItem, { left: 128, top: 52 }]}>
+              <Avatar who="murad" size={70} />
+            </Animated.View>
+            <Animated.View entering={enter(3, 'pop', 120)} style={{ position: 'absolute', right: 0, top: -6 }}>
+              <FamilyMascot pose="wave" size={112} />
+            </Animated.View>
           </View>
+          <Animated.View entering={enter(2, 'up', 120)}>
+            <Txt v="overline" color={C.ai}>
+              Hara Ailə
+            </Txt>
+            <Txt v="h1" style={{ marginTop: 6 }} accessibilityRole="header">
+              Sevdiklərin də ən az riskli yolla getsin
+            </Txt>
+          </Animated.View>
         </LinearGradient>
 
-        <View style={{ paddingHorizontal: 18, marginTop: -26 }}>
-          <View style={[styles.priceCard, shadow(2)]}>
-            <View>
-              <Txt w="black" size={34}>
+        <View style={{ paddingHorizontal: 20, gap: 10 }}>
+          <Animated.View entering={enter(3, 'up', 120)} style={[styles.priceCard, shadow(2)]}>
+            <View style={{ flex: 1 }}>
+              <Txt v="num">
                 {PRICE}
-                <Txt w="semi" size={16} color={C.muted}>
-                  {' '}
-                  / ay
+                <Txt v="body" color={C.muted}>
+                  {'  / ay'}
                 </Txt>
               </Txt>
-              <Txt w="med" size={13.5} color={C.muted}>
-                5 ailə üzvünə qədər · 7 gün pulsuz
+              <Txt v="caption" color={C.muted} style={{ marginTop: 2 }}>
+                5 ailə üzvünə qədər
               </Txt>
             </View>
-            <Tag label="Ucuz və əlçatan" bg={C.brand} color={C.navy} />
-          </View>
+            <Tag label="7 gün pulsuz" icon="gift-outline" bg={C.brandSoft} color={C.brandDark} />
+          </Animated.View>
 
-          <View style={{ gap: 10, marginTop: 14 }}>
-            {FEATURES.map((f) => (
-              <View key={f.t} style={styles.feature}>
-                <View style={styles.fIcon}>
-                  <Icon name={f.icon} size={24} color={C.navy} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Txt w="bold" size={16}>
-                    {f.t}
-                  </Txt>
-                  <Txt w="med" size={13.5} color={C.muted}>
-                    {f.s}
-                  </Txt>
-                </View>
-                <Icon name="check-circle" size={22} color={C.safe} />
+          {FEATURES.map((f, i) => (
+            <Animated.View key={f.t} entering={enter(i + 4, 'up', 120)} style={styles.feature}>
+              <View style={styles.fIcon}>
+                <Icon name={f.icon} size={22} color={C.ai} />
               </View>
-            ))}
-          </View>
+              <View style={{ flex: 1 }}>
+                <Txt v="title">{f.t}</Txt>
+                <Txt v="bodyS" color={C.muted}>
+                  {f.s}
+                </Txt>
+              </View>
+              <Icon name="check-circle" size={20} color={C.brand} />
+            </Animated.View>
+          ))}
 
-          <PillButton
-            label={paying ? 'Ödəniş təsdiqlənir…' : `Abunə ol · ${PRICE}/ay`}
-            variant="black"
-            style={{ marginTop: 18 }}
-            disabled={paying}
-            onPress={() => {
-              setPaying(true);
-              setTimeout(() => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-                setSubscribed(true);
-                showToast('Hara Ailə aktivdir', 'crown-outline');
-              }, 1300);
-            }}
-          />
-          <Txt w="med" size={12.5} color={C.muted} center style={{ marginTop: 10 }}>
-            İstənilən vaxt ləğv et{'\n'}Standart paketdə bütün təhlükəsizlik funksiyaları pulsuzdur
-          </Txt>
+          <Animated.View entering={enter(9, 'up', 120)}>
+            <PillButton
+              label={paying ? 'Təsdiqlənir…' : '7 gün pulsuz başla'}
+              icon={paying ? 'timer-sand' : 'crown-outline'}
+              variant="brand"
+              style={{ marginTop: 8 }}
+              disabled={paying}
+              onPress={() => {
+                setPaying(true);
+                setTimeout(() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  setSubscribed(true);
+                  showToast('Hara Ailə aktivdir', 'crown-outline');
+                }, 1100);
+              }}
+            />
+            <Txt v="caption" color={C.muted} center style={{ marginTop: 10 }}>
+              Sonra {PRICE}/ay · istənilən vaxt ləğv et{'\n'}Təhlükəsizlik funksiyaları hər kəs üçün pulsuzdur
+            </Txt>
+          </Animated.View>
         </View>
       </ScrollView>
+      <TopScrim color="#EEEEFF" />
     </View>
+  );
+}
+
+/* ------------------------------------------------------------------ dashboard */
+
+function LiveBar({ progress, arrived }: { progress: number; arrived: boolean }) {
+  const v = useSharedValue(progress);
+  useEffect(() => {
+    v.value = withTiming(progress, { duration: 420, easing: Easing.out(Easing.quad) });
+  }, [progress, v]);
+  const fill = useAnimatedStyle(() => ({ width: `${Math.round(v.value * 1000) / 10}%` }));
+  return (
+    <View style={styles.bar}>
+      <Animated.View style={[styles.barFill, { backgroundColor: arrived ? C.brand : C.route }, fill]} />
+    </View>
+  );
+}
+
+/** Hold-to-send SOS (1.2 s) so it never fires by accident. */
+function SosButton({ onFire }: { onFire: () => void }) {
+  const p = useSharedValue(0);
+  const fired = useRef(false);
+  const showToast = useAppStore((s) => s.showToast);
+  const fill = useAnimatedStyle(() => ({ width: `${p.value * 100}%` }));
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="SOS, basıb saxla"
+      onPressIn={() => {
+        fired.current = false;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        p.value = withTiming(1, { duration: 1200, easing: Easing.linear });
+      }}
+      onLongPress={() => {
+        fired.current = true;
+        p.value = withTiming(0, { duration: 300 });
+        onFire();
+      }}
+      delayLongPress={1200}
+      onPressOut={() => {
+        if (!fired.current) {
+          cancelAnimation(p);
+          p.value = withSpring(0, SPRING.snappy);
+        }
+      }}
+      onPress={() => showToast('SOS üçün düyməni basıb saxla', 'gesture-tap-hold')}
+      style={styles.sos}
+    >
+      <Animated.View style={[styles.sosFill, fill]} />
+      <Icon name="shield-alert" size={24} color="#FFFFFF" />
+      <Txt w="xbold" size={17} color="#FFFFFF">
+        SOS
+      </Txt>
+      <Txt w="semi" size={13} color="rgba(255,255,255,0.85)">
+        · basıb saxla
+      </Txt>
+    </Pressable>
+  );
+}
+
+function Member({ i, who, name, status, tone, right }: { i: number; who: 'aysel' | 'murad' | 'nene'; name: string; status: string; tone: 'safe' | 'live' | 'muted'; right?: React.ReactNode }) {
+  const col = tone === 'safe' ? C.brandDark : tone === 'live' ? C.route : C.muted;
+  const bg = tone === 'safe' ? C.brandSoft : tone === 'live' ? C.purple : C.bg2;
+  return (
+    <Animated.View entering={enter(i, 'up', 160)} style={styles.member}>
+      <Avatar who={who} size={52} />
+      <View style={{ flex: 1, gap: 5 }}>
+        <Txt v="title">{name}</Txt>
+        <Tag label={status} bg={bg} color={col} icon={tone === 'safe' ? 'check-circle' : tone === 'live' ? 'walk' : 'moon-waning-crescent'} />
+      </View>
+      {right}
+    </Animated.View>
   );
 }
 
@@ -118,165 +211,185 @@ function Dashboard() {
   const nene = useMemo(() => makeTrack(toLatLngs(f.nene.c)), [f]);
   const murad = useMemo(() => toLatLngs(f.murad.c), [f]);
   const region = useMemo(() => regionFor([...nene.pts, ...murad], 1.5), [nene, murad]);
-  const sat = useSatelliteType(region.latitudeDelta);
-  const [progress, setProgress] = useState(0.18);
+  const [progress, setProgress] = useState(0.2);
   const [arrived, setArrived] = useState(false);
   const [shareNight, setShareNight] = useState(true);
   const [notifyArrival, setNotifyArrival] = useState(true);
   const [sos, setSos] = useState(false);
   const fired = useRef(false);
+  const trackMarkers = useMarkerSnapshot();
+  const notifyRef = useRef(notifyArrival);
+  notifyRef.current = notifyArrival;
 
   useEffect(() => {
+    if (arrived) return;
     const id = setInterval(() => {
       setProgress((p) => {
-        const np = Math.min(1, p + 0.012);
+        const np = Math.min(1, p + 0.02);
         if (np >= 1 && !fired.current) {
           fired.current = true;
-          setArrived(true);
-          if (notifyArrival) triggerFamilyArrival('Nənə');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          setTimeout(() => {
+            setArrived(true);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+            say(BRAND.neneArrived);
+            if (notifyRef.current) triggerFamilyArrival('Nənə');
+          }, 0);
         }
         return np;
       });
-    }, 500);
+    }, 450);
     return () => clearInterval(id);
-  }, [notifyArrival]);
+  }, [arrived]);
 
   const pos = pointAt(nene, nene.total * progress).p;
-  const remaining = Math.max(0, Math.round((nene.total * (1 - progress)) / 1.1 / 60));
+  const remaining = Math.max(1, Math.round((nene.total * (1 - progress)) / 1.1 / 60));
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: 40 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
-          <Heading light="Hara" bold="Ailə" size={32} style={{ flex: 1 }} />
-          <Tag label="Premium" icon="crown-outline" bg={C.brand} color={C.navy} style={{ height: 36, paddingHorizontal: 14 }} />
-        </View>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: insets.bottom + 28, gap: 12 }} showsVerticalScrollIndicator={false}>
+        <Animated.View entering={enter(0, 'fade')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <CircleButton icon="chevron-left" size={48} onPress={() => router.back()} />
+          <View style={{ flex: 1 }}>
+            <Txt v="h1" accessibilityRole="header">
+              Ailəm
+            </Txt>
+          </View>
+          <Tag label="Hara Ailə" icon="crown-outline" bg={C.aiSoft} color={C.ai} style={{ height: 34, paddingHorizontal: 12 }} />
+        </Animated.View>
 
-        {/* reference "Connecting…" visual */}
-        <View style={styles.connect}>
-          <Txt w="semi" size={17} center>
-            {arrived ? 'Nənə evə çatdı ✓' : 'Bağlantı aktivdir…'}
-          </Txt>
-          <View style={styles.connectStage}>
-            <View style={styles.orbit} />
-            <View style={styles.orbitIcon}>
-              <Icon name={arrived ? 'home-heart' : 'walk'} size={24} color={C.navy} />
+        {/* live hero: Nənə on her way → arrived */}
+        <Animated.View entering={enter(1, 'up')} style={[styles.live, arrived && { backgroundColor: C.brandSoft }, shadow(1)]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {arrived ? null : <Pulse size={78} color={C.route} />}
+              <Avatar who="nene" size={62} />
+              {arrived ? (
+                <Pop style={styles.okBadge}>
+                  <Icon name="check" size={16} color="#FFFFFF" />
+                </Pop>
+              ) : null}
+              {arrived ? <Burst size={180} /> : null}
             </View>
-            <View style={[styles.bigCircle, { backgroundColor: C.brand, left: 22, top: 0 }]}>
-              <Avatar size={74} initials="A" />
-              <Txt w="semi" size={14} color="#FFFFFF" style={{ marginTop: 6 }}>
-                Sən
+            <View style={{ flex: 1, gap: 3 }}>
+              <Txt v="overline" color={arrived ? C.brandDark : C.route}>
+                {arrived ? 'Çatdı · indi' : 'Canlı · yoldadır'}
+              </Txt>
+              <Txt v="h3">{arrived ? 'Nənə evə çatdı' : 'Nənə evə gedir'}</Txt>
+              <Txt v="bodyS" color={C.ink2}>
+                {arrived ? 'Yolda işıqforsuz keçid olmadı.' : `${remaining} dəq qalıb · işıqforlu keçidlərlə`}
               </Txt>
             </View>
-            <View style={[styles.bigCircle, { backgroundColor: C.route, right: 22, top: 86 }]}>
-              <Avatar size={74} initials="N" />
-              <Txt w="semi" size={14} color="#FFFFFF" style={{ marginTop: 6 }}>
-                Nənə
-              </Txt>
-            </View>
-            <View style={styles.linkPill}>
-              <Icon name="link-variant" size={26} color={C.brand} />
-            </View>
+            <ScoreRing score={92} size={58} />
           </View>
-        </View>
+          <LiveBar progress={progress} arrived={arrived} />
+        </Animated.View>
 
-        <View style={[styles.member, { marginTop: 12 }]}>
-          <Avatar size={64} initials="M" />
-          <View style={{ flex: 1 }}>
-            <Txt w="xbold" size={19}>
-              Murad · 11 yaş
-            </Txt>
-            <Tag label="Məktəbə çatdı · 08:12" icon="check-circle" bg={C.safeSoft} color={C.safe} style={{ marginTop: 6 }} />
-          </View>
-        </View>
-
-        <View style={styles.member}>
-          <Avatar size={64} initials="N" />
-          <View style={{ flex: 1 }}>
-            <Txt w="xbold" size={19}>
-              Nənə
-            </Txt>
-            <Tag
-              label={arrived ? 'Evə çatdı ✓' : `Səfərdədir · ${remaining} dəq qalıb`}
-              bg={arrived ? C.safeSoft : C.brandSoft}
-              color={arrived ? C.safe : C.navy}
-              style={{ marginTop: 6 }}
-            />
-          </View>
-          <ScoreRing score={92} size={64} />
-        </View>
-
-        <View style={styles.mapWrap}>
-          <MapView provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} mapType={sat.mapType} onRegionChangeComplete={sat.onRegionChangeComplete} customMapStyle={MAP_STYLE_FOR_TYPE} initialRegion={region} toolbarEnabled={false}>
-            <Polyline coordinates={murad} strokeColor={C.safe} strokeWidth={6} lineCap="round" />
+        <Animated.View entering={enter(2, 'up')} style={styles.mapWrap}>
+          <MapView
+            style={StyleSheet.absoluteFill}
+            mapType="standard"
+            customMapStyle={MAP_STYLE}
+            initialRegion={region}
+            toolbarEnabled={false}
+            pitchEnabled={false}
+            rotateEnabled={false}
+          >
+            <Polyline coordinates={murad} strokeColor={C.brand} strokeWidth={5} lineCap="round" />
             <Polyline coordinates={nene.pts} strokeColor={C.halo} strokeWidth={14} lineCap="round" />
-            <Polyline coordinates={nene.pts} strokeColor={C.route} strokeWidth={6} lineCap="round" />
-            <IconPin latitude={f.home.lat} longitude={f.home.lon} icon="home-outline" bg={C.black} color={C.ink} />
-            <IconPin latitude={f.school.lat} longitude={f.school.lon} icon="school-outline" bg={C.safe} color={C.ink} />
-            <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={30}>
+            <Polyline coordinates={nene.pts} strokeColor={C.route} strokeWidth={5.5} lineCap="round" lineJoin="round" />
+            <Marker coordinate={{ latitude: f.home.lat, longitude: f.home.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={trackMarkers}>
+              <View style={[styles.place, { backgroundColor: C.navy }]}>
+                <Icon name="home-variant" size={16} color="#FFFFFF" />
+              </View>
+            </Marker>
+            <Marker coordinate={{ latitude: f.school.lat, longitude: f.school.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={trackMarkers}>
+              <View style={[styles.place, { backgroundColor: C.brand }]}>
+                <Icon name="school" size={16} color="#FFFFFF" />
+              </View>
+            </Marker>
+            <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={trackMarkers} zIndex={30}>
               <View style={styles.neneDot}>
-                <Txt w="xbold" size={14} color={C.navy}>
+                <Txt w="xbold" size={13} color="#FFFFFF">
                   N
                 </Txt>
               </View>
             </Marker>
           </MapView>
           <View style={styles.mapLabel}>
-            <Txt w="semi" size={13}>
-              Məktəb yolu · işıqforsuz keçid yoxdur
-            </Txt>
+            <Icon name="traffic-light" size={15} color={C.brandDark} />
+            <Txt v="label">Bütün keçidlər işıqforludur</Txt>
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.toggles}>
+        <Member i={3} who="murad" name="Murad · 11 yaş" status="Məktəbə çatdı · 08:12" tone="safe" right={<ScoreRing score={88} size={44} showShield={false} />} />
+        <Member
+          i={4}
+          who="nene"
+          name="Nənə"
+          status={arrived ? 'Evdədir' : `Yoldadır · ${remaining} dəq`}
+          tone={arrived ? 'safe' : 'live'}
+          right={<CircleButton icon="phone-outline" size={44} bg={C.bg2} label="Nənəyə zəng et" onPress={() => showToast('Nənəyə zəng edilir…', 'phone')} />}
+        />
+        <Member i={5} who="aysel" name="Sən" status={shareNight ? 'Gecə səfərləri paylaşılır' : 'Paylaşım söndürülüb'} tone="muted" />
+
+        <Animated.View entering={enter(6, 'up', 160)} style={styles.toggles}>
           <View style={styles.toggleRow}>
-            <Txt w="semi" size={16}>
+            <Icon name="weather-night" size={20} color={C.ink2} />
+            <Txt v="title" style={{ flex: 1 }}>
               Gecə səfərini paylaş
             </Txt>
-            <Switch value={shareNight} onValueChange={setShareNight} trackColor={{ true: C.brand }} thumbColor="#fff" />
+            <Switch value={shareNight} onValueChange={(v) => (Haptics.selectionAsync().catch(() => {}), setShareNight(v))} trackColor={{ true: C.brand, false: C.line }} thumbColor="#FFFFFF" />
           </View>
           <View style={styles.divider} />
           <View style={styles.toggleRow}>
-            <Txt w="semi" size={16}>
-              Gəlişdə bildiriş
+            <Icon name="bell-ring-outline" size={20} color={C.ink2} />
+            <Txt v="title" style={{ flex: 1 }}>
+              Çatanda bildiriş
             </Txt>
-            <Switch value={notifyArrival} onValueChange={setNotifyArrival} trackColor={{ true: C.brand }} thumbColor="#fff" />
+            <Switch value={notifyArrival} onValueChange={(v) => (Haptics.selectionAsync().catch(() => {}), setNotifyArrival(v))} trackColor={{ true: C.brand, false: C.line }} thumbColor="#FFFFFF" />
           </View>
-        </View>
+        </Animated.View>
 
-        <PillButton
-          label="SOS"
-          icon="shield-alert-outline"
-          variant="danger"
-          height={64}
-          style={{ marginTop: 14 }}
-          onPress={() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-            setSos(true);
-          }}
-        />
-        <PillButton label="Zəng et" icon="phone-outline" variant="white" style={{ marginTop: 10 }} onPress={() => showToast('Nənəyə zəng edilir…', 'phone')} />
+        <Animated.View entering={enter(7, 'up', 160)}>
+          <SosButton
+            onFire={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+              setSos(true);
+              say(BRAND.sosSent);
+            }}
+          />
+        </Animated.View>
       </ScrollView>
+      <TopScrim />
 
-      <Modal visible={sos} transparent animationType="fade" onRequestClose={() => setSos(false)}>
+      <Modal visible={sos} transparent animationType="fade" onRequestClose={() => setSos(false)} statusBarTranslucent>
         <View style={styles.backdrop}>
-          <View style={styles.modal}>
-            <View style={[styles.okIcon, { backgroundColor: C.danger }]}>
-              <Icon name="shield-alert" size={40} color={C.ink} />
+          <Animated.View entering={enter(0, 'pop')} style={styles.modal}>
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Pulse size={120} color={C.danger} />
+              <View style={styles.sosIcon}>
+                <Icon name="shield-alert" size={38} color="#FFFFFF" />
+              </View>
             </View>
-            <Txt w="black" size={24} center style={{ marginTop: 14 }}>
+            <Txt v="h2" center style={{ marginTop: 14 }}>
               SOS göndərildi
             </Txt>
-            <Txt w="med" size={15} color={C.ink2} center style={{ marginTop: 8 }}>
-              Ailə üzvlərinə canlı yer və marşrut göndərildi.{'\n'}Yaxınlıqdakı işıqlı, insanlı yer: Gənclik m.
+            <Txt v="body" color={C.ink2} center style={{ marginTop: 8 }}>
+              Ailənə canlı yerin və marşrutun göndərildi. Ən yaxın işıqlı, insanlı yer: Gənclik metrosu.
             </Txt>
-            <Txt w="med" size={12.5} color={C.muted} center style={{ marginTop: 10 }}>
-              112 xidmətinə bir toxunuşla zəng
-            </Txt>
-            <PillButton label="Bağla" variant="black" style={{ marginTop: 18, alignSelf: 'stretch' }} onPress={() => setSos(false)} />
-          </View>
+            <View style={styles.sosRow}>
+              <AhmedAvatar size={34} mood="alert" />
+              <Txt v="bodyS" color={C.ink2} style={{ flex: 1 }}>
+                Narahat olma, yanındayam. Lazım olsa 112-yə bir toxunuşla zəng et.
+              </Txt>
+            </View>
+            <PillButton label="112-yə zəng et" icon="phone" variant="danger" style={{ marginTop: 16, alignSelf: 'stretch' }} onPress={() => showToast('112 xidmətinə zəng edilir…', 'phone')} />
+            <PressableScale accessibilityRole="button" onPress={() => setSos(false)} style={styles.close}>
+              <Txt w="semi" size={15} color={C.ink2}>
+                Bağla
+              </Txt>
+            </PressableScale>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -284,48 +397,29 @@ function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  hero: { paddingHorizontal: 18, paddingBottom: 48, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
-  priceCard: { backgroundColor: C.surface, borderRadius: R.card, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hero: { paddingHorizontal: 20, paddingBottom: 22, gap: 6 },
+  cluster: { height: 140, marginTop: 4, marginBottom: 6 },
+  clusterItem: { position: 'absolute', borderRadius: 60, ...shadow(1) },
+  priceCard: { backgroundColor: C.bg, borderRadius: R.lg, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: C.line },
   feature: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.surface, borderRadius: R.lg, padding: 14 },
-  fIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  connect: { backgroundColor: C.surface, borderRadius: R.card, paddingTop: 18, paddingBottom: 10, marginTop: 16, overflow: 'hidden' },
-  connectStage: { height: 250, marginTop: 6 },
-  orbit: {
-    position: 'absolute',
-    left: '50%',
-    top: 18,
-    width: 210,
-    height: 210,
-    marginLeft: -105,
-    borderRadius: 105,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#9AA1B2',
-  },
-  orbitIcon: { position: 'absolute', right: 44, top: 14, width: 44, height: 44, borderRadius: 22, backgroundColor: C.bg2, alignItems: 'center', justifyContent: 'center' },
-  bigCircle: { position: 'absolute', width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center' },
-  linkPill: {
-    position: 'absolute',
-    left: '50%',
-    top: 106,
-    marginLeft: -38,
-    width: 76,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: C.navy,
-    borderWidth: 3,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  member: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.surface, borderRadius: R.card, padding: 14, marginTop: 10 },
-  mapWrap: { height: 230, borderRadius: R.card, overflow: 'hidden', marginTop: 12, backgroundColor: C.surface },
-  mapLabel: { position: 'absolute', left: 12, bottom: 12, backgroundColor: C.surface, borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 8 },
-  neneDot: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.brand, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  toggles: { backgroundColor: C.surface, borderRadius: R.lg, paddingHorizontal: 16, marginTop: 12 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 58 },
+  fIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.aiSoft, alignItems: 'center', justifyContent: 'center' },
+  live: { backgroundColor: C.surface, borderRadius: R.lg, padding: 16, gap: 14 },
+  okBadge: { position: 'absolute', right: -4, bottom: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: C.brand, borderWidth: 2.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  bar: { height: 8, borderRadius: 4, backgroundColor: 'rgba(15,27,45,0.08)', overflow: 'hidden' },
+  barFill: { height: 8, borderRadius: 4 },
+  mapWrap: { height: 210, borderRadius: R.lg, overflow: 'hidden', backgroundColor: C.surface },
+  mapLabel: { position: 'absolute', left: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 7 },
+  place: { width: 30, height: 30, borderRadius: 15, borderWidth: 2.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  neneDot: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ai, borderWidth: 3, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  member: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.surface, borderRadius: R.lg, padding: 12 },
+  toggles: { backgroundColor: C.surface, borderRadius: R.lg, paddingHorizontal: 16 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 58 },
   divider: { height: 1, backgroundColor: C.line },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 22 },
-  modal: { backgroundColor: C.bg, borderRadius: 34, padding: 24, alignItems: 'center' },
-  okIcon: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  sos: { height: 62, borderRadius: R.pill, backgroundColor: C.danger, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, overflow: 'hidden' },
+  sosFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.22)' },
+  backdrop: { flex: 1, backgroundColor: C.scrim, justifyContent: 'center', padding: 22 },
+  modal: { backgroundColor: C.bg, borderRadius: 32, padding: 24, alignItems: 'center' },
+  sosIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: C.danger, alignItems: 'center', justifyContent: 'center' },
+  sosRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface, borderRadius: R.md, padding: 12, marginTop: 14, alignSelf: 'stretch' },
+  close: { height: 48, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
 });
