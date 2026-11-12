@@ -21,6 +21,7 @@ import { Donut } from '@/components/charts';
 import { AnimatedNumber, enter, PressableScale, Skeleton } from '@/motion';
 import { C, R, scoreColor, scoreSoft } from '@/theme';
 import { CityMap, type CityMapHandle, type MapLayer } from './CityMap';
+import { useScanStore } from '@/store/scan';
 
 const fmt = (n: number, d = 0) => (d ? n.toFixed(d).replace('.', ',') : Math.round(n).toLocaleString('en-US').replace(/,/g, ' '));
 
@@ -177,6 +178,7 @@ export function CityScreen() {
   const insets = useSafeAreaInsets();
   const { height: H } = useWindowDimensions();
   const [mode, setMode] = useState<Mode>('night');
+  const contributions = useScanStore((s) => s.history.filter((h) => h.contributed).length);
   const [layer, setLayer] = useState<MapLayer>('risk');
   const [ready, setReady] = useState(false);
   const [sel, setSel] = useState<{ lat: number; lon: number } | null>(null);
@@ -494,6 +496,14 @@ export function CityScreen() {
                 Bu keçidlərin gecə balı ehtiyatla hesablanır. Küçələrdə isə işıq qeydi uzunluğun yalnız {fmt(k.litTaggedPct, 1)}%-ində var. AI Göz ilə çəkilən hər keçid
                 işığı, zolaqları və adanı qata əlavə edir.
               </Txt>
+              {contributions > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="check-circle" size={16} color={C.brand} />
+                  <Txt w="semi" size={13} color={C.brandDark}>
+                    Bu cihazdan {contributions} keçid AI Göz ilə əlavə olunub
+                  </Txt>
+                </View>
+              ) : null}
               <PressableScale
                 accessibilityRole="button"
                 onPress={() => router.push('/scan')}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { router } from 'expo-router';
 import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import type { Factor, Rating, VisionAttrs } from '@/ai/vision';
@@ -178,11 +179,23 @@ export function ResultPanel({
       </ScrollView>
       <Animated.View entering={enter(0, 'up', base + 1100)} style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: bottomPad, gap: 6, borderTopWidth: 1, borderTopColor: C.line, backgroundColor: C.bg }}>
         <ContributeButton done={contributed} onPress={onContribute} />
-        <PressableScale onPress={onAgain} accessibilityRole="button" style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <Txt w="semi" size={14.5} color={C.ink2}>
-            Başqa keçidi yoxla
-          </Txt>
-        </PressableScale>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+          <PressableScale onPress={onAgain} accessibilityRole="button" style={{ height: 40, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Txt w="semi" size={14.5} color={C.ink2}>
+              Başqa keçidi yoxla
+            </Txt>
+          </PressableScale>
+          {contributed ? (
+            <Animated.View entering={enter(0, 'fade')}>
+              <PressableScale onPress={() => router.push('/city')} accessibilityRole="button" style={{ height: 40, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="city-variant-outline" size={17} color={C.route} />
+                <Txt w="semi" size={14.5} color={C.route}>
+                  Şəhər paneli
+                </Txt>
+              </PressableScale>
+            </Animated.View>
+          ) : null}
+        </View>
       </Animated.View>
     </View>
   );
