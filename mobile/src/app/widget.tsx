@@ -27,7 +27,7 @@ function Wallpaper() {
   return (
     <>
       <LinearGradient colors={['#0A1A3A', '#071532', '#06122A']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
-      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 860" preserveAspectRatio="xMidYMid slice">
+      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 860" preserveAspectRatio="xMidYMid slice" opacity={0.6}>
         <Path d="M-20 190 C 80 120 160 150 230 110 S 360 40 420 70" stroke="#1A4766" strokeWidth={2} fill="none" />
         <Path d="M230 110 C 250 170 300 220 420 260" stroke="#1A4766" strokeWidth={2} fill="none" />
         <Path d="M-30 640 C 90 600 170 640 260 590 S 380 520 430 540" stroke="#1A4766" strokeWidth={2} fill="none" />
