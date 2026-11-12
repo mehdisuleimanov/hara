@@ -72,14 +72,14 @@ function useSpeakQueue() {
 }
 
 /** Quick white dissolve used to hide the satellite → vector map swap after the 3D intro. */
-function Dissolve({ trigger }: { trigger: number }) {
+function Dissolve({ trigger, night }: { trigger: number; night: boolean }) {
   const v = useSharedValue(0);
   useEffect(() => {
     if (!trigger) return;
     v.value = withSequence(withTiming(1, { duration: 220 }), withTiming(1, { duration: 260 }), withTiming(0, { duration: 520, easing: Easing.inOut(Easing.quad) }));
   }, [trigger, v]);
   const a = useAnimatedStyle(() => ({ opacity: v.value * 0.9 }));
-  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF' }, a]} />;
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: night ? '#17223A' : '#FFFFFF' }, a]} />;
 }
 
 function VehiclePuck({ icon, bg }: { icon: string; bg: string }) {
@@ -233,6 +233,8 @@ export default function Navigate() {
 
   // ---- camera per mode
   const lastCamLeg = useRef(-1);
+  const camHeading = useRef<number | null>(null);
+  const camHold = useRef(0);
   useEffect(() => {
     if (phase !== 'go' || !follow) return;
     if (under) {
@@ -244,9 +246,23 @@ export default function Navigate() {
       }
       return;
     }
-    lastCamLeg.current = li;
     const ride = mode === 'taxi' || mode === 'bus';
-    mapRef.current?.animateCamera({ center: pos, heading, pitch: ride ? 45 : PITCH, zoom: ride ? ZOOM_RIDE : ZOOM_WALK }, { duration: TICK + 40 });
+    // smooth the bearing so the 3D camera eases through turns instead of snapping
+    const prevH = camHeading.current ?? heading;
+    let dh = ((heading - prevH + 540) % 360) - 180;
+    if (Math.abs(dh) < 0.5) dh = 0;
+    camHeading.current = (prevH + dh * 0.35 + 360) % 360;
+    const now = Date.now();
+    if (lastCamLeg.current !== li) {
+      // leg change (e.g. out of the metro): one long cinematic move back into 3D
+      lastCamLeg.current = li;
+      camHeading.current = heading;
+      camHold.current = now + 1300;
+      mapRef.current?.animateCamera({ center: pos, heading, pitch: ride ? 45 : PITCH, zoom: ride ? ZOOM_RIDE : ZOOM_WALK }, { duration: 1200 });
+      return;
+    }
+    if (now < camHold.current) return;
+    mapRef.current?.animateCamera({ center: pos, heading: camHeading.current, pitch: ride ? 45 : PITCH, zoom: ride ? ZOOM_RIDE : ZOOM_WALK }, { duration: TICK + 40 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dist, follow, phase]);
 
@@ -439,7 +455,7 @@ export default function Navigate() {
         )}
       </MapView>
 
-      <Dissolve trigger={dissolve} />
+      <Dissolve trigger={dissolve} night={night} />
 
       {/* maneuver header */}
       {phase !== 'arrived' ? (
