@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { C } from '@/theme';
 
-/** Small live waveform; bar heights follow the mic level when active. */
+/**
+ * Live mic waveform: a scrolling history of real metering samples (newest on the right).
+ * Bars animate on the UI thread; the parent only pushes a number when metering updates.
+ */
 export function Waveform({
   level,
   active,
-  bars = 9,
+  bars = 28,
   color = C.ink,
   height = 34,
 }: {
@@ -16,25 +20,33 @@ export function Waveform({
   color?: string;
   height?: number;
 }) {
-  const [seed, setSeed] = useState(0);
+  const hist = useSharedValue<number[]>(Array.from({ length: bars }, () => 0));
   useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setSeed((s) => s + 1), 90);
-    return () => clearInterval(id);
-  }, [active]);
+    if (!active) {
+      hist.value = Array.from({ length: bars }, () => 0);
+      return;
+    }
+    const next = hist.value.slice(1);
+    next.push(Math.max(0, Math.min(1, level)));
+    hist.value = next;
+  }, [level, active, bars, hist]);
+
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height }}>
-      {Array.from({ length: bars }).map((_, i) => {
-        const center = 1 - Math.abs(i - (bars - 1) / 2) / ((bars - 1) / 2);
-        const jitter = active ? 0.55 + 0.45 * Math.abs(Math.sin(seed * 0.9 + i * 1.7)) : 0.3;
-        const h = Math.max(5, height * (0.18 + 0.82 * center * Math.max(0.25, level) * jitter));
-        return (
-          <View
-            key={i}
-            style={{ width: 5, height: h, borderRadius: 3, backgroundColor: color, opacity: 0.35 + center * 0.65 }}
-          />
-        );
-      })}
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, height }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: bars }).map((_, i) => (
+        <Bar key={i} i={i} n={bars} hist={hist} color={color} height={height} />
+      ))}
     </View>
   );
 }
+
+const Bar = React.memo(function Bar({ i, n, hist, color, height }: { i: number; n: number; hist: SharedValue<number[]>; color: string; height: number }) {
+  const a = useAnimatedStyle(() => {
+    const v = hist.value[i] ?? 0;
+    // gentle shaping so quiet speech is still visible
+    const h = 4 + (height - 4) * Math.min(1, Math.pow(v, 0.8) * 1.1);
+    return { height: withTiming(h, { duration: 90 }) };
+  });
+  const fade = 0.25 + 0.75 * (i / (n - 1));
+  return <Animated.View style={[{ width: 3.5, borderRadius: 2, backgroundColor: color, opacity: fade }, a]} />;
+});
