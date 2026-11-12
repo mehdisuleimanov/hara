@@ -153,7 +153,15 @@ export function ScanScreen() {
       setExpectMs(3600);
       setPhase('scan');
       const t0 = Date.now();
+      log('[scan] captured', pic.width, pic.height, String(pic.uri).slice(0, 60));
       const small = await shrink(pic.uri);
+      if (my !== run.current) return;
+      // show the normalized JPEG (orientation-corrected, small) as the frozen frame
+      if (small.uri && small.width && small.height) {
+        const fs: Frame = { source: { uri: small.uri }, iw: small.width, ih: small.height, live: true };
+        f = fs;
+        setFrame(fs);
+      }
       const attrs = await analyzePhoto(small.base64);
       const wait = Math.max(0, 1600 - (Date.now() - t0));
       later(() => {
@@ -196,6 +204,9 @@ export function ScanScreen() {
   };
 
   const bottomPad = Math.max(insets.bottom, 12) + 4;
+  // landscape photos are shown uncropped (all boxes visible); tall ones are cropped to fit
+  const imgH = frame ? Math.min(stageFinal - 26, Math.max(insets.top + 180, Math.round((W * frame.ih) / frame.iw))) : stageFinal - 26;
+  const stageH = imgH + 26; // the sheet overlaps this navy strip, never the photo
 
   return (
     <View style={{ flex: 1, backgroundColor: C.navy }}>
@@ -218,8 +229,8 @@ export function ScanScreen() {
           />
         </View>
       ) : (
-        <View style={{ width: W, height: stageFinal, overflow: 'hidden', backgroundColor: C.navy }}>
-          {frame ? <Stage key={String(frame.sampleId ?? (frame.source as { uri?: string }).uri)} source={frame.source} iw={frame.iw} ih={frame.ih} w={W} h={stageFinal} phase={phase} boxes={result?.attrs.boxes ?? []} /> : null}
+        <View style={{ width: W, height: stageH, overflow: 'hidden', backgroundColor: C.navy }}>
+          {frame ? <Stage key={frame.sampleId ?? 'live'} source={frame.source} iw={frame.iw} ih={frame.ih} w={W} h={imgH} phase={phase} boxes={result?.attrs.boxes ?? []} /> : null}
         </View>
       )}
 
