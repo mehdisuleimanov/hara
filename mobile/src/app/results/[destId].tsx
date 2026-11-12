@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { SnapMarker } from '@/features/map/SnapMarker';
 import ReAnimated, { FadeIn, FadeInDown, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -296,7 +297,7 @@ function ResultsView({
     }), destLL, { latitude: lm.drop.lat, longitude: lm.drop.lon }];
     if (lm.betterDrop) pts.push({ latitude: lm.betterDrop.lat, longitude: lm.betterDrop.lon });
     setTimeout(() => {
-      mapRef.current?.fitToCoordinates(pts, { edgePadding: { top: insets.top + 90, right: 50, bottom: 380 - peekVis, left: 50 }, animated: true });
+      mapRef.current?.fitToCoordinates(pts, { edgePadding: { top: insets.top + 90, right: 50, bottom: 450 - peekVis, left: 50 }, animated: true });
       setTimeout(() => mapRef.current?.animateCamera({ pitch: 32 }, { duration: 900 }), 1100);
     }, 120);
     setTimeout(() => say(lm.note || NAV.lastMetersFallback), 900);
@@ -387,13 +388,13 @@ function ResultsView({
         rotateEnabled={false}
       >
         {!lmOpen ? <RouteLayer options={options} selectedId={opt.id} t={t} night={night} dark={look.dark} /> : null}
-        <Marker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={30}>
+        <SnapMarker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }} zIndex={30}>
           <MeArrow size={34} heading={20} />
-        </Marker>
+        </SnapMarker>
         {landed ? (
-          <Marker coordinate={destLL} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} zIndex={31}>
+          <SnapMarker coordinate={destLL} anchor={{ x: 0.5, y: 1 }} zIndex={31}>
             <PinView icon={dest.icon} color={C.navy} />
-          </Marker>
+          </SnapMarker>
         ) : null}
         {lmOpen && lm && dropPos ? <LastMetersLayer lm={lm} drop={dropPos} dest={destLL} tRed={tRed} tGreen={tGreen} moved={moved} /> : null}
       </MapView>

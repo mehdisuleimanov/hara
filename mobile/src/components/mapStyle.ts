@@ -20,6 +20,8 @@ export const MAP_STYLE = [
   { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: '#D7F2E1' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
   { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  // Google labels are English-only: keep the main avenues, hide the noise of small streets
+  { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
   { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#FFFFFF' }] },
   { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#D3DCE8' }] },
   { featureType: 'road.arterial', elementType: 'geometry.stroke', stylers: [{ color: '#E1E7EF' }] },
@@ -42,6 +44,8 @@ export const MAP_STYLE_NIGHT = [
   { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: '#18352F' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27354F' }] },
   { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  // Google labels are English-only: keep the main avenues, hide the noise of small streets
+  { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
   { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#33445F' }] },
   { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1B263C' }] },
   { featureType: 'road.arterial', elementType: 'geometry.stroke', stylers: [{ color: '#1E2A41' }] },

@@ -1,6 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Marker, Polyline } from 'react-native-maps';
+import { SnapMarker } from './SnapMarker';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import type { LastMeters, LatLng } from '@/data/types';
 import { sliceByFraction } from '@/motion/routeDraw';
@@ -77,18 +78,18 @@ export const LastMetersLayer = memo(function LastMetersLayer({
         </>
       ) : null}
       {!moved && lm.crossing && tGreen > 0.5 ? (
-        <Marker coordinate={{ latitude: lm.crossing.lat, longitude: lm.crossing.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={50}>
+        <SnapMarker coordinate={{ latitude: lm.crossing.lat, longitude: lm.crossing.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={50}>
           <PinBadge icon={lm.crossing.type === 3 ? 'stairs-down' : 'traffic-light'} bg={C.brand} size={34} />
-        </Marker>
+        </SnapMarker>
       ) : null}
-      <Marker coordinate={drop} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={52}>
+      <SnapMarker coordinate={drop} anchor={{ x: 0.5, y: 0.5 }} zIndex={52}>
         <PinBadge icon="taxi" bg={C.navy} />
-      </Marker>
+      </SnapMarker>
       {/* web preview: the pulsing overlay isn't available -> static label */}
       {Platform.OS === 'web' && !moved && mid && tRed >= 1 ? (
-        <Marker coordinate={mid} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={55}>
+        <SnapMarker coordinate={mid} anchor={{ x: 0.5, y: 0.5 }} zIndex={55}>
           <LanesPill lanes={lm.lanes} />
-        </Marker>
+        </SnapMarker>
       ) : null}
     </>
   );
@@ -183,7 +184,7 @@ export function LastMetersCard({
         <View style={styles.ahmedArt}>
           <AhmedAvatar size={30} mood={speaking ? 'talk' : 'smile'} />
         </View>
-        <Txt w="med" size={13.5} color={C.ink2} style={{ flex: 1 }} numberOfLines={3}>
+        <Txt w="med" size={13.5} color={C.ink2} style={{ flex: 1 }} numberOfLines={4}>
           {moved ? NAV.dropMoved : lm.note || NAV.lastMetersFallback}
         </Txt>
         <View style={styles.play}>
@@ -191,19 +192,17 @@ export function LastMetersCard({
         </View>
       </PressableScale>
 
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-        {moved ? (
-          <>
-            <ActionBtn label="Əvvəlki nöqtə" icon="undo-variant" variant="ghost" onPress={onRevert} />
-            <ActionBtn label="Sürücüyə göndər" icon="send" variant="brand" onPress={onSend} grow />
-          </>
-        ) : (
-          <>
-            {lm.betterDrop ? <ActionBtn label="Düşmə nöqtəsini dəyiş" icon="map-marker-path" variant="brand" onPress={onMove} grow /> : null}
-            <ActionBtn label="Sürücüyə göndər" icon="send" variant={lm.betterDrop ? 'ghost' : 'brand'} onPress={onSend} grow={!lm.betterDrop} />
-          </>
-        )}
-      </View>
+      {moved ? (
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+          <ActionBtn label="Əvvəlki nöqtə" icon="undo-variant" variant="ghost" onPress={onRevert} />
+          <ActionBtn label="Sürücüyə göndər" icon="send" variant="brand" onPress={onSend} grow />
+        </View>
+      ) : (
+        <View style={{ gap: 8, marginTop: 12 }}>
+          {lm.betterDrop ? <ActionBtn label="Düşmə nöqtəsini dəyiş" icon="map-marker-path" variant="brand" onPress={onMove} /> : null}
+          <ActionBtn label="Sürücüyə göndər" icon="send" variant={lm.betterDrop ? 'ghost' : 'brand'} onPress={onSend} />
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -217,7 +216,7 @@ function ActionBtn({ label, icon, variant, onPress, grow }: { label: string; ico
       haptic="medium"
       scaleTo={0.97}
       onPress={onPress}
-      style={[styles.action, grow ? { flex: brand ? 1.25 : 1 } : { paddingHorizontal: 16 }, brand ? { backgroundColor: C.brand } : { backgroundColor: C.bg2 }]}
+      style={[styles.action, grow ? { flex: 1 } : null, brand ? { backgroundColor: C.brand } : { backgroundColor: C.bg2 }]}
     >
       <Icon name={icon} size={19} color={brand ? '#FFFFFF' : C.ink} />
       <Txt w="bold" size={14} color={brand ? '#FFFFFF' : C.ink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ flexShrink: 1 }}>

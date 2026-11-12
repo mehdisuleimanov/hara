@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { SnapMarker } from '@/features/map/SnapMarker';
 import Animated, { Easing, FadeIn, FadeInDown, FadeInUp, FadeOut, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -416,43 +417,43 @@ export default function Navigate() {
           <StationMarker key={`st-${s.key}`} s={s.st} major={s.major} dark={look.dark} />
         ))}
         {plan.hazards.map((h, i) => (
-          <Marker key={`hz${i}`} coordinate={{ latitude: h.lat, longitude: h.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={20}>
+          <SnapMarker key={`hz${i}`} coordinate={{ latitude: h.lat, longitude: h.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={20}>
             <View style={styles.hzDot}>
               <Icon name="alert" size={13} color="#FFFFFF" />
             </View>
-          </Marker>
+          </SnapMarker>
         ))}
         {nearReports.map((r) => {
           const m = REPORT_META[r.category];
           return <IconPin key={r.id} latitude={r.lat} longitude={r.lon} icon={m.icon} bg={m.tone === 'danger' ? C.danger : C.warn} size={34} />;
         })}
         {end ? (
-          <Marker coordinate={end} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={25}>
+          <SnapMarker coordinate={end} anchor={{ x: 0.5, y: 0.5 }} zIndex={25}>
             <View style={styles.finishPin}>
               <Icon name="flag-checkered" size={22} color={C.navy} />
             </View>
-          </Marker>
+          </SnapMarker>
         ) : null}
         {metroPuck ? (
-          <Marker key={`mp-${li}`} coordinate={metroPuck} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={45}>
+          <SnapMarker key={`mp-${li}`} coordinate={metroPuck} anchor={{ x: 0.5, y: 0.5 }} zIndex={45}>
             <VehiclePuck icon="subway-variant" bg={C.underground} />
-          </Marker>
+          </SnapMarker>
         ) : mode === 'taxi' || mode === 'bus' ? (
-          <Marker key={`vp-${mode}`} coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={45}>
+          <SnapMarker key={`vp-${mode}`} coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} zIndex={45}>
             <VehiclePuck icon={mode === 'taxi' ? 'taxi' : 'bus'} bg={mode === 'taxi' ? C.navy : C.route} />
-          </Marker>
+          </SnapMarker>
         ) : (
-          <Marker
+          <SnapMarker
             key="me"
             coordinate={pos}
             anchor={{ x: 0.5, y: 0.55 }}
             flat={false}
             rotation={Platform.OS !== 'web' && (!follow || phase !== 'go') ? Math.round(heading) : 0}
-            tracksViewChanges={false}
+           
             zIndex={45}
           >
             <MeArrow size={54} heading={Platform.OS === 'web' ? heading : 0} />
-          </Marker>
+          </SnapMarker>
         )}
       </MapView>
 

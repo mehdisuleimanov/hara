@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { View } from 'react-native';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 import { Marker, Polyline } from 'react-native-maps';
+import { SnapMarker } from '@/features/map/SnapMarker';
 import type { RouteOption } from '@/data/types';
 import { toLatLngs } from '@/utils/geo';
 import { C } from '@/theme';
@@ -112,17 +113,17 @@ export function MeArrow({ size = 56, heading = 0, halo = true }: { size?: number
 
 export function OriginPin({ latitude, longitude, heading = 20 }: { latitude: number; longitude: number; heading?: number }) {
   return (
-    <Marker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={20}>
+    <SnapMarker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 0.5 }} zIndex={20}>
       <MeArrow size={34} heading={heading} />
-    </Marker>
+    </SnapMarker>
   );
 }
 
 export function DestPin({ latitude, longitude, icon = 'flag-checkered' }: { latitude: number; longitude: number; icon?: string }) {
   return (
-    <Marker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} zIndex={21}>
+    <SnapMarker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} zIndex={21}>
       <PinView icon={icon} />
-    </Marker>
+    </SnapMarker>
   );
 }
 
@@ -147,10 +148,10 @@ export function IconPin({
 }) {
   // bg is the semantic tone (danger / warn) -> used for the icon; the pin itself stays navy
   return (
-    <Marker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} onPress={onPress} zIndex={15}>
+    <SnapMarker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} onPress={onPress} zIndex={15}>
       <View style={{ padding: 6 }}>
         <PinView icon={icon} iconColor={bg && bg !== '#fff' && bg !== '#FFFFFF' ? bg : color ?? C.ink} size={size} badge={badge} />
       </View>
-    </Marker>
+    </SnapMarker>
   );
 }

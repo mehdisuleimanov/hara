@@ -57,9 +57,6 @@ function ModeChain({ option, color = C.muted }: { option: RouteOption; color?: s
           </React.Fragment>
         );
       })}
-      <Txt w="med" size={12.5} color={color} numberOfLines={1} style={{ flexShrink: 1, marginLeft: 2 }}>
-        {option.co2g > 0 ? `${option.co2g} q CO₂` : '0 q CO₂'}
-      </Txt>
     </View>
   );
 }
@@ -189,6 +186,12 @@ export const RouteCard = React.memo(function RouteCard({
         <Txt w="bold" size={14} color={C.ink2} style={{ marginTop: 2 }}>
           {option.price}
         </Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
+          <Icon name="leaf" size={12} color={option.co2g === 0 ? C.safe : C.muted} />
+          <Txt w="semi" size={11.5} color={option.co2g === 0 ? C.brandDark : C.muted}>
+            {option.co2g} q CO₂
+          </Txt>
+        </View>
       </View>
     </Animated.View>
   );

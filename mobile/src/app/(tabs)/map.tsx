@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { SnapMarker } from '@/features/map/SnapMarker';
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -179,9 +180,9 @@ export default function MapScreen() {
               );
             })
           : null}
-        <Marker coordinate={ME} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={40}>
+        <SnapMarker coordinate={ME} anchor={{ x: 0.5, y: 0.5 }} zIndex={40}>
           <MeArrow size={40} heading={25} />
-        </Marker>
+        </SnapMarker>
       </MapView>
 
       {/* overlays: "you" pulse + report pins popping in (native) */}

@@ -1,6 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { View } from 'react-native';
 import { Marker, Polyline } from 'react-native-maps';
+import { SnapMarker } from './SnapMarker';
 import type { RouteOption } from '@/data/types';
 import { LAYER } from '@/data/layer';
 import { Txt } from '@/components/ui';
@@ -12,13 +13,13 @@ import { crossingsAlong, isUnderground, legFraction, legGeos, legLatLngs, legSta
 export const StationMarker = memo(function StationMarker({ s, major, dark }: { s: Station; major: boolean; dark?: boolean }) {
   if (!major) {
     return (
-      <Marker coordinate={{ latitude: s.lat, longitude: s.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={24}>
+      <SnapMarker coordinate={{ latitude: s.lat, longitude: s.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={24}>
         <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: C.underground }} />
-      </Marker>
+      </SnapMarker>
     );
   }
   return (
-    <Marker coordinate={{ latitude: s.lat, longitude: s.lon }} anchor={{ x: 0.5, y: 0.25 }} tracksViewChanges={false} zIndex={26}>
+    <SnapMarker coordinate={{ latitude: s.lat, longitude: s.lon }} anchor={{ x: 0.5, y: 0.25 }} zIndex={26}>
       <View style={{ alignItems: 'center', paddingHorizontal: 4 }}>
         <View
           style={{
@@ -51,7 +52,7 @@ export const StationMarker = memo(function StationMarker({ s, major, dark }: { s
           </Txt>
         </View>
       </View>
-    </Marker>
+    </SnapMarker>
   );
 });
 
@@ -59,11 +60,11 @@ export const StationMarker = memo(function StationMarker({ s, major, dark }: { s
 export const CrossingDot = memo(function CrossingDot({ lat, lon, score, big }: { lat: number; lon: number; score: number; big?: boolean }) {
   const s = big ? 16 : 12;
   return (
-    <Marker coordinate={{ latitude: lat, longitude: lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={18}>
+    <SnapMarker coordinate={{ latitude: lat, longitude: lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={18}>
       <View style={{ width: s + 6, height: s + 6, alignItems: 'center', justifyContent: 'center' }}>
         <View style={{ width: s, height: s, borderRadius: s / 2, backgroundColor: scoreColor(score), borderWidth: 2.5, borderColor: '#FFFFFF' }} />
       </View>
-    </Marker>
+    </SnapMarker>
   );
 });
 
