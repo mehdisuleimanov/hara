@@ -3,9 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Icon, Txt } from '@/components/ui';
-import { AnimatedNumber, PressableScale, Skeleton, enter } from '@/motion';
+import { AnimatedNumber, PressableScale, enter } from '@/motion';
 import { C, R } from '@/theme';
 import { riskiestCrossings, type RiskSpot } from './context';
+import { upperAz } from '@/features/a11y/text';
 
 /** "Bu gecə ən riskli 3 keçid" — computed on-device from the real safety layer. */
 export function RiskInsight({ night, base = 0 }: { night: boolean; base?: number }) {
@@ -42,7 +43,7 @@ export function RiskInsight({ night, base = 0 }: { night: boolean; base?: number
           </View>
           <View style={{ flex: 1 }}>
             <Txt v="overline" color={C.muted}>
-              Təhlükəsizlik qatı
+              {upperAz('Təhlükəsizlik qatı')}
             </Txt>
             <Txt w="xbold" size={17} style={{ marginTop: 2 }}>
               {night ? 'Bu gecə ən riskli 3 keçid' : 'Bu axşam ən riskli 3 keçid'}
@@ -78,12 +79,12 @@ export function RiskInsight({ night, base = 0 }: { night: boolean; base?: number
               ))
             : [0, 1, 2].map((i) => (
                 <View key={i} style={styles.row}>
-                  <Skeleton width={28} height={28} radius={14} />
+                  <View style={[styles.ph, { width: 28, height: 28, borderRadius: 14 }]} />
                   <View style={{ flex: 1, gap: 6 }}>
-                    <Skeleton width="62%" height={13} />
-                    <Skeleton width="40%" height={10} />
+                    <View style={[styles.ph, { width: '62%', height: 13 }]} />
+                    <View style={[styles.ph, { width: '40%', height: 10 }]} />
                   </View>
-                  <Skeleton width={56} height={28} radius={14} />
+                  <View style={[styles.ph, { width: 56, height: 28, borderRadius: 14 }]} />
                 </View>
               ))}
         </View>
@@ -109,5 +110,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: R.md, paddingHorizontal: 12, paddingVertical: 10 },
   rank: { width: 28, height: 28, borderRadius: 14, backgroundColor: C.bg2, alignItems: 'center', justifyContent: 'center' },
   score: { flexDirection: 'row', alignItems: 'baseline', gap: 1, backgroundColor: C.dangerSoft, borderRadius: R.pill, paddingHorizontal: 10, height: 30, alignSelf: 'center', paddingTop: 5 },
+  ph: { backgroundColor: C.bg2, borderRadius: 8 },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingHorizontal: 2 },
 });

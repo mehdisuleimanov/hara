@@ -20,6 +20,7 @@ import { say } from '@/voice';
 import { A11Y } from '@/voice/lines/a11y';
 import { TopFade } from '@/features/home/TopFade';
 import { C, C_HC, R, shadow } from '@/theme';
+import { upperAz } from '@/features/a11y/text';
 
 type Step = { icon: string; title: string; sub: string; status: string; tone: 'ok' | 'bad' | 'info' };
 
@@ -73,7 +74,7 @@ export default function Accessible() {
 
         <Animated.View entering={enter(1)}>
           <Txt v="overline" color={C.muted} style={{ marginTop: 18 }}>
-            Pilləkənsiz marşrut
+            {upperAz('Pilləkənsiz marşrut')}
           </Txt>
           <Txt v="h1" style={{ marginTop: 6 }} accessibilityRole="header">
             Hiltona pilləkənsiz yol

@@ -9,6 +9,7 @@ import { Icon, Txt } from '@/components/ui';
 import { say } from '@/voice';
 import { A11Y } from '@/voice/lines/a11y';
 import { C, R, Z } from '@/theme';
+import { upperAz } from './text';
 
 /**
  * One-tap adaptive UI. morphTo(mode, tapPoint) grows a brand-colored circle from the
@@ -179,7 +180,7 @@ export function A11yMorphHost() {
                 <AhmedAvatar size={74} mood="talk" />
               </View>
               <Txt v="overline" color={dark ? '#FFFFFF' : C.muted} center style={{ marginTop: 18 }}>
-                Görünüş dəyişdi
+                {upperAz('Görünüş dəyişdi')}
               </Txt>
               <Txt v="h1" color={dark ? '#FFFFFF' : C.ink} center style={{ marginTop: 6 }}>
                 {m.title}

@@ -19,6 +19,7 @@ import { TopFade } from '@/features/home/TopFade';
 import { USER_NAME } from '@/features/home/context';
 import { stop as stopVoice } from '@/voice';
 import { C, C_HC, R, shadow } from '@/theme';
+import { upperAz } from '@/features/a11y/text';
 
 const WEEK = [5, 8, 3, 9, 7, 4, 10];
 const DAYS = ['B.e', 'Ç.a', 'Ç', 'C.a', 'C', 'Ş', 'B'];
@@ -136,7 +137,7 @@ export default function Profile() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ flex: 1 }}>
                 <Txt v="overline" color="rgba(255,255,255,0.7)">
-                  Səviyyə 4 · Şəhər qəhrəmanı
+                  {upperAz('Səviyyə 4 · Şəhər qəhrəmanı')}
                 </Txt>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
                   <AnimatedNumber value={points} v="hero" color="#FFFFFF" duration={1100} />

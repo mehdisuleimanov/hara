@@ -17,6 +17,7 @@ import { RiskInsight } from './RiskInsight';
 import { RecentPlaces } from './RecentPlaces';
 import { TopFade } from './TopFade';
 import { USER_NAME, ahmedLine, greeting, nearbyReports } from './context';
+import { upperAz } from '@/features/a11y/text';
 
 const fmt1 = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
@@ -72,7 +73,7 @@ export function StandardHome() {
       {/* greeting */}
       <Animated.View entering={enter(0)} style={{ marginTop: 18 }}>
         <Txt v="overline" color={C.muted}>
-          {greeting()}, {USER_NAME}
+          {upperAz(`${greeting()}, ${USER_NAME}`)}
         </Txt>
         <Txt v="hero" style={{ marginTop: 6 }} accessibilityRole="header">
           Hara gedirsən?

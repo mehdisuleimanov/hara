@@ -24,6 +24,7 @@ import { A11Y } from '@/voice/lines/a11y';
 import { TopFade } from '@/features/home/TopFade';
 import { distM, nearbyReports } from '@/features/home/context';
 import { C, C_HC, R, shadow } from '@/theme';
+import { upperAz } from '@/features/a11y/text';
 
 const CATS = Object.keys(REPORT_META) as ReportCategory[];
 
@@ -158,7 +159,7 @@ export default function Report() {
         <Animated.View entering={enter(0)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <Txt v="overline" color={C.muted} style={{ flex: 1 }}>
-              Bildir · şəhəri birlikdə qoruyaq
+              {upperAz('Bildir · şəhəri birlikdə qoruyaq')}
             </Txt>
             <View style={styles.points}>
               <Icon name="star-four-points" size={15} color={C.brandDark} />

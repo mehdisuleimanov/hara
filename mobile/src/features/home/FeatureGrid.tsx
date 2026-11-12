@@ -40,7 +40,7 @@ const TILES: Tile[] = [
     key: 'simple',
     title: 'Sadə rejim',
     sub: 'Bir toxunuşla böyük yazı və səs',
-    icon: 'human-cane',
+    icon: 'format-size',
     bg: C.brandSoft,
     disc: '#FFFFFF',
     iconColor: C.brandDark,
