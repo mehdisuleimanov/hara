@@ -597,6 +597,7 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 8 },
   input: {
     flex: 1,
+    minWidth: 0,
     height: 54,
     borderRadius: R.pill,
     backgroundColor: '#FFFFFF',
