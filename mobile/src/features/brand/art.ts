@@ -3,7 +3,7 @@
  * and the illustrated people avatars (Aysel, Murad, Nənə).
  *
  * Pure data, no React Native imports: the app renders it with react-native-svg
- * (components/Brand.tsx) and scripts/render-brand.mjs renders it in Node for the store art.
+ * (components/Brand.tsx); toSvg/mascotSvg/avatarSvg serialize it for Node previews.
  * Coordinates: mascot viewBox "0 0 140 150" (full) / "20 4 100 116" (head); avatars "0 0 100 100".
  */
 

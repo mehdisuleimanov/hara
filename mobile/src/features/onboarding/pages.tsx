@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -44,6 +44,12 @@ export function useParallax(scrollX: SharedValue<number>, i: number, w: number) 
   return { art, text };
 }
 
+/** Measured height of the flexible art area (pages adapt to small screens and Sadə rejim). */
+function useArtHeight(): [number, (e: LayoutChangeEvent) => void] {
+  const [h, setH] = useState(0);
+  return [h, (e) => setH(Math.round(e.nativeEvent.layout.height))];
+}
+
 /** Title + body block shared by the pages. */
 function Copy({ overline, title, body, style }: { overline: string; title: string; body: string; style?: object }) {
   return (
@@ -65,6 +71,9 @@ function Copy({ overline, title, body, style }: { overline: string; title: strin
 
 export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>; w: number; active: boolean }) {
   const { art, text } = useParallax(scrollX, 0, w);
+  const [artH, onArt] = useArtHeight();
+  // full-body art is 140x150; leave room for the speech bubble
+  const mascot = Math.round(Math.max(130, Math.min(w * 0.62, 270, artH ? ((artH - 72) * 140) / 150 : 270)));
   const voice = useVoice();
   const [greet, setGreet] = useState('');
   const [shown] = useTypewriter(greet, 38);
@@ -106,7 +115,7 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
 
   return (
     <View style={[styles.page, { width: w }]}>
-      <Animated.View style={[styles.art, { justifyContent: 'center' }, art]}>
+      <Animated.View onLayout={onArt} style={[styles.art, { justifyContent: 'center' }, art]}>
         <Glow size={Math.min(w * 1.05, 400)} color="#2FE0C0" intensity={0.5} style={{ marginTop: 70 }} />
         <Animated.View style={[styles.bubble, bubbleA]}>
           <Txt w="bold" size={15.5} color={C.ink}>
@@ -116,7 +125,7 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
         </Animated.View>
         <Animated.View entering={enter(0, 'pop', 150)}>
           <Animated.View style={hopA}>
-            <OnboardingMascot pose="wave" size={Math.min(w * 0.62, 270)} speaking={voice.speaking} />
+            <OnboardingMascot pose="wave" size={mascot} speaking={voice.speaking} />
           </Animated.View>
         </Animated.View>
       </Animated.View>
@@ -134,6 +143,7 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
 
 export function SaferRoute({ scrollX, w, active }: { scrollX: SharedValue<number>; w: number; active: boolean }) {
   const { art, text } = useParallax(scrollX, 1, w);
+  const [artH, onArt] = useArtHeight();
   const said = useRef(false);
   useEffect(() => {
     if (!active || said.current) return;
@@ -143,8 +153,8 @@ export function SaferRoute({ scrollX, w, active }: { scrollX: SharedValue<number
   }, [active]);
   return (
     <View style={[styles.page, { width: w }]}>
-      <Animated.View style={[styles.art, { justifyContent: 'center' }, art]}>
-        <View style={styles.mapCard}>
+      <Animated.View onLayout={onArt} style={[styles.art, { justifyContent: 'center' }, art]}>
+        <View style={[styles.mapCard, artH ? { maxWidth: Math.max(200, ((artH - 56) * 320) / 230) } : null]}>
           <MiniMap active={active} />
         </View>
       </Animated.View>
@@ -174,7 +184,7 @@ const PROFILES: { key: Profile; label: string; icon: string; tip: string }[] = [
   { key: 'scooter', label: 'Skuter', icon: 'scooter', tip: 'Küləyi və velosiped zolaqlarını izləyəcəm.' },
 ];
 
-function Orbit({ who, x, y, delay, active }: { who: 'aysel' | 'murad' | 'nene'; x: number; y: number; delay: number; active: boolean }) {
+function Orbit({ who, x, y, delay, active, size }: { who: 'aysel' | 'murad' | 'nene'; x: number; y: number; delay: number; active: boolean; size: number }) {
   const v = useSharedValue(0);
   useEffect(() => {
     if (active) v.value = withDelay(delay, withSpring(1, SPRING.bouncy));
@@ -182,7 +192,7 @@ function Orbit({ who, x, y, delay, active }: { who: 'aysel' | 'murad' | 'nene'; 
   const a = useAnimatedStyle(() => ({ opacity: v.value, transform: [{ translateX: x * v.value }, { translateY: y * v.value }, { scale: 0.4 + 0.6 * v.value }] }));
   return (
     <Animated.View style={[{ position: 'absolute' }, a]}>
-      <Avatar who={who} size={62} ring="#FFFFFF" />
+      <Avatar who={who} size={size} ring="#FFFFFF" />
     </Animated.View>
   );
 }
@@ -195,7 +205,10 @@ export function AdaptsToYou({ scrollX, w, active }: { scrollX: SharedValue<numbe
   const simple = mode !== 'standard';
   const switchRef = useRef<React.ComponentRef<typeof View>>(null);
   const tip = PROFILES.find((p) => p.key === profile)?.tip ?? PROFILES[0].tip;
-  const r = Math.min(w * 0.3, 118);
+  const [artH, onArt] = useArtHeight();
+  const r = Math.max(52, Math.min(w * 0.3, 118, artH ? (artH - 64) / 2 : 118));
+  const face = Math.round(Math.min(92, r * 0.8));
+  const bubble = Math.round(Math.min(62, r * 0.55));
 
   const toggleSimple = (on: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -210,12 +223,12 @@ export function AdaptsToYou({ scrollX, w, active }: { scrollX: SharedValue<numbe
 
   return (
     <View style={[styles.page, { width: w }]}>
-      <Animated.View style={[styles.art, { flex: 0, height: r * 2 + 64, justifyContent: 'center' }, art]}>
+      <Animated.View onLayout={onArt} style={[styles.art, { maxHeight: 300, minHeight: 150, justifyContent: 'center' }, art]}>
         <View style={[styles.ring, { width: r * 2, height: r * 2, borderRadius: r }]} />
-        <Orbit who="aysel" x={-r * 0.94} y={-r * 0.34} delay={120} active={active} />
-        <Orbit who="murad" x={r * 0.87} y={-r * 0.5} delay={220} active={active} />
-        <Orbit who="nene" x={r * 0.62} y={r * 0.78} delay={320} active={active} />
-        <AhmedAvatar size={92} mood="smile" />
+        <Orbit who="aysel" x={-r * 0.94} y={-r * 0.34} delay={120} active={active} size={bubble} />
+        <Orbit who="murad" x={r * 0.87} y={-r * 0.5} delay={220} active={active} size={bubble} />
+        <Orbit who="nene" x={r * 0.62} y={r * 0.78} delay={320} active={active} size={bubble} />
+        <AhmedAvatar size={face} mood="smile" />
       </Animated.View>
       <Animated.View style={[{ gap: 14 }, text]}>
         <Copy overline="Sənin üçün qurulur" title="Sənə uyğunlaşır" body="Necə hərəkət edirsən? Əhməd yolu ona görə seçir." />
