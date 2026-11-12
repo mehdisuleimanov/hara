@@ -18,6 +18,7 @@ import { useWeather } from '@/utils/weather';
 import { say, stop } from '@/voice';
 import { BRAND } from '@/voice/lines/brand';
 import { useMarkerSnapshot } from '@/features/brand/useMarkerSnapshot';
+import { TopScrim } from '@/features/brand/TopScrim';
 import { C, R, shadow } from '@/theme';
 
 /**
@@ -240,6 +241,7 @@ export default function Scooter() {
           )}
         </Animated.View>
       </ScrollView>
+      <TopScrim />
     </View>
   );
 }

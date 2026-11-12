@@ -11,6 +11,7 @@ import { ROUTES } from '@/data/routes';
 import { MAP_STYLE } from '@/components/mapStyle';
 import { AhmedAvatar, Avatar } from '@/components/Brand';
 import { FamilyMascot } from '@/features/brand/FamilyMascot';
+import { TopScrim } from '@/features/brand/TopScrim';
 import { ScoreRing } from '@/components/ScoreRing';
 import { Burst, Pop, Pulse } from '@/components/anim';
 import { CircleButton, Icon, PillButton, Tag, Txt } from '@/components/ui';
@@ -126,6 +127,7 @@ function Paywall() {
           </Animated.View>
         </View>
       </ScrollView>
+      <TopScrim color="#EEEEFF" />
     </View>
   );
 }
@@ -358,6 +360,7 @@ function Dashboard() {
           />
         </Animated.View>
       </ScrollView>
+      <TopScrim />
 
       <Modal visible={sos} transparent animationType="fade" onRequestClose={() => setSos(false)} statusBarTranslucent>
         <View style={styles.backdrop}>
