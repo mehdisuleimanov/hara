@@ -61,6 +61,21 @@ export const LegPolyline = memo(function LegPolyline({
       />
     );
   }
+  // walk inside a metro station (entrance / exit / transfer): light dotted passage, not a street
+  if (leg.indoor && leg.mode === 'walk') {
+    if (state === 'inactive' && (opacity ?? 1) <= 0) return null;
+    return (
+      <Polyline
+        coordinates={coords}
+        strokeColor={state === 'active' ? (dark ? 'rgba(213,143,176,0.75)' : 'rgba(142,59,91,0.55)') : dark ? 'rgba(255,255,255,0.3)' : 'rgba(15,27,45,0.2)'}
+        strokeWidth={3}
+        lineDashPattern={[2, 6]}
+        lineCap="round"
+        lineJoin="round"
+        zIndex={zIndex + 1}
+      />
+    );
+  }
   if (state === 'inactive') {
     const o = opacity == null ? 1 : Math.max(0, Math.min(1, opacity));
     if (o <= 0) return null;

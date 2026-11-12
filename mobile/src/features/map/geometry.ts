@@ -108,7 +108,7 @@ export function legFraction(g: { legs: LegGeo[]; total: number }, i: number, t: 
 export function crossingsAlong(o: RouteOption, radiusM = 28, max = 40): number[] {
   const pts: LatLng[] = [];
   for (const l of o.legs) {
-    if (isUnderground(l) || l.mode === 'taxi' || l.mode === 'bus') continue;
+    if (isUnderground(l) || l.indoor || l.mode === 'taxi' || l.mode === 'bus') continue;
     const ll = legLatLngs(l);
     for (let i = 0; i < ll.length; i++) pts.push(ll[i]);
   }

@@ -78,7 +78,7 @@ export function buildPlan(option: RouteOption, night: boolean): Plan {
   // Hazards: risky crossings right next to the walking parts (from the real safety layer).
   const walkPts: LatLng[] = [];
   option.legs.forEach((l) => {
-    if (l.mode === 'walk' && !isUnderground(l)) walkPts.push(...toLatLngs(l.c));
+    if (l.mode === 'walk' && !isUnderground(l) && !l.indoor) walkPts.push(...toLatLngs(l.c));
   });
   const hazards: Hazard[] = [];
   const collect = (radius: number) => {

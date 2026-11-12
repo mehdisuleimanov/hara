@@ -116,7 +116,7 @@ export const RouteLayer = memo(function RouteLayer({
         : null}
       {/* soft glow underlay: the whole path, the line then traces over it */}
       {sel.legs.map((l, i) =>
-        isUnderground(l) ? null : (
+        isUnderground(l) || l.indoor ? null : (
           <Polyline
             key={`glow-${i}`}
             coordinates={legLatLngs(l)}

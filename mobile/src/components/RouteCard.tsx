@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { interpolate, interpolateColor, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import type { RouteKind, RouteOption } from '@/data/types';
+import { KIND_TITLE, titleOf } from '@/data/routes';
 import { SPRING } from '@/motion/springs';
 import { C, R } from '@/theme';
 import { ScoreRing } from './ScoreRing';
@@ -31,6 +32,33 @@ const MODE_TINT: Record<string, { bg: string; fg: string }> = {
   bike: { bg: C.brandSoft, fg: C.brandDark },
 };
 
+function modeTitle(o: RouteOption) {
+  const m = o.legs.map((l) => l.mode);
+  if (m.includes('metro')) return 'Metro ilə';
+  if (m.includes('bus')) return 'Avtobusla';
+  if (m.includes('taxi')) return 'Taksi';
+  if (m.includes('scooter')) return 'Skuterlə';
+  return 'Piyada';
+}
+
+/** The option with the highest safety score for the current time of day (ties: safest kind, then quicker). */
+export function bestOption(options: RouteOption[], night: boolean): RouteOption | undefined {
+  const sc = (o: RouteOption) => (night ? o.scoreNight : o.scoreDay);
+  return [...options].sort((a, b) => sc(b) - sc(a) || (a.kind === 'safest' ? -1 : b.kind === 'safest' ? 1 : 0) || a.durationMin - b.durationMin)[0];
+}
+
+/**
+ * Card title that never overclaims: only the highest-scored option (for now: day or night)
+ * is "Ən az riskli"; the rest use the data-driven title (titleOf) or their mode.
+ */
+export function cardTitle(o: RouteOption, options: RouteOption[], night: boolean) {
+  const best = bestOption(options, night);
+  if (best && o.id === best.id) return 'Ən az riskli';
+  const t = titleOf(o, options);
+  if (t === KIND_TITLE.safest) return modeTitle(o);
+  return t;
+}
+
 /** "Qarşı tərəfdə düşürür · 6 zolaq" when the last-meters analysis flags the drop-off. */
 export function lastMetersLabel(o: RouteOption) {
   const lm = o.lastMeters;
@@ -40,7 +68,8 @@ export function lastMetersLabel(o: RouteOption) {
 }
 
 function ModeChain({ option, color = C.muted }: { option: RouteOption; color?: string }) {
-  const legs = option.legs.filter((l, i) => l.mode !== 'walk' || l.distanceM >= 60 || option.legs.length === 1 || i === 0);
+  const vis = option.legs.filter((l) => !l.indoor);
+  const legs = vis.filter((l) => l.mode !== 'walk' || l.distanceM >= 60 || vis.length === 1);
   return (
     <View style={styles.chain}>
       {legs.map((l, i) => {
@@ -105,6 +134,7 @@ export const RouteCard = React.memo(function RouteCard({
   onPress,
   onLastMeters,
   ringDelay = 0,
+  title,
 }: {
   option: RouteOption;
   night: boolean;
@@ -113,6 +143,8 @@ export const RouteCard = React.memo(function RouteCard({
   onPress: () => void;
   onLastMeters?: () => void;
   ringDelay?: number;
+  /** display title (see cardTitle); defaults to the kind label */
+  title?: string;
 }) {
   const s = night ? option.scoreNight : option.scoreDay;
   const v = useSharedValue(selected ? 1 : 0);
@@ -141,7 +173,7 @@ export const RouteCard = React.memo(function RouteCard({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected }}
-        accessibilityLabel={`${KIND_LABEL[option.kind]}, ${option.durationMin} dəqiqə, ${option.price}, bal ${s}`}
+        accessibilityLabel={`${title ?? KIND_LABEL[option.kind]}, ${option.durationMin} dəqiqə, ${option.price}, bal ${s}`}
         onPress={() => {
           tap();
           onPress();
@@ -154,7 +186,7 @@ export const RouteCard = React.memo(function RouteCard({
       <View style={{ flex: 1, gap: 7 }} pointerEvents="box-none">
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="none">
           <Txt w="xbold" size={16.5} numberOfLines={1} style={{ flexShrink: 1 }}>
-            {KIND_LABEL[option.kind]}
+            {title ?? KIND_LABEL[option.kind]}
           </Txt>
           {recommended ? (
             <View style={styles.rec}>

@@ -25,7 +25,6 @@ import { PressableScale } from '@/motion/PressableScale';
 import { LegPolyline } from '@/features/map/LegPolyline';
 import { StationMarker } from '@/features/map/RouteLayer';
 import { DayNightIcon } from '@/features/map/MapControls';
-import { withDevFixtures } from '@/features/map/devFixtures';
 import { say, stop, voiceState } from '@/voice';
 import { NAV } from '@/voice/lines/nav';
 import { COMMON } from '@/voice/lines/common';
@@ -137,8 +136,8 @@ export default function Navigate() {
       if (lr && o) return { option: o, destName: lr.place.name, destShort: lr.place.name };
     }
     const d = destById(destKey) ?? destById('hilton')!;
-    const opts = withDevFixtures(d.id, [optionOf(d.id, kind) ?? optionOf(d.id, 'safest') ?? optionOf('hilton', 'safest')!]);
-    return { option: opts[0], destName: d.name, destShort: d.short };
+    const o = optionOf(d.id, kind) ?? optionOf(d.id, 'safest') ?? optionOf('hilton', 'safest')!;
+    return { option: o, destName: d.name, destShort: d.short };
   }, [scooter, destKey, kind]);
 
   const plan = useMemo(() => buildPlan(option, night), [option, night]);

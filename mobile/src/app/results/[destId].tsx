@@ -15,7 +15,7 @@ import { liveRouteById, type LiveRoute } from '@/features/routing/live';
 import { scriptedReply } from '@/ai/ahmed';
 import { useMapLook } from '@/components/mapStyle';
 import { MeArrow, PinView } from '@/components/RouteLines';
-import { KIND_LABEL, RouteCard } from '@/components/RouteCard';
+import { bestOption, cardTitle, RouteCard } from '@/components/RouteCard';
 import { CircleButton, Icon, Txt, tap } from '@/components/ui';
 import { Pulse } from '@/components/anim';
 import { Skeleton } from '@/motion/Skeleton';
@@ -32,7 +32,6 @@ import { Anchored, useMapOverlay } from '@/features/map/overlay';
 import { GlassChip, MapControls, NightVeil } from '@/features/map/MapControls';
 import { LastMetersCard, LastMetersLabel, LastMetersLayer } from '@/features/map/LastMeters';
 import { AhmedExplain } from '@/features/map/AhmedExplain';
-import { withDevFixtures } from '@/features/map/devFixtures';
 import { C, R, shadow } from '@/theme';
 
 /**
@@ -98,7 +97,7 @@ export default function Results() {
   }, [isLive, live, liveId, destId]);
 
   const dest = isLive ? (live ? placeAsDest(live) : undefined) : destById(destId);
-  const options = useMemo<RouteOption[]>(() => (isLive ? live?.options ?? [] : withDevFixtures(destId, optionsFor(destId))), [isLive, live, destId]);
+  const options = useMemo<RouteOption[]>(() => (isLive ? live?.options ?? [] : optionsFor(destId)), [isLive, live, destId]);
 
   if (isLive && !live && !liveGaveUp) return <ResultsSkeleton />;
   if (!dest || !options.length) return <ResultsEmpty />;
@@ -136,13 +135,16 @@ function ResultsView({
   const overlay = useMapOverlay(mapRef);
 
   const ahmedCtx = lastAhmed && (lastAhmed.destId === destId || (isLive && lastAhmed.liveRouteId && destId === `live:${lastAhmed.liveRouteId}`)) ? lastAhmed : null;
-  const recommended: RouteKind = ahmedCtx?.preference ?? 'safest';
+  // the badge and the "Ən az riskli" title always go to the highest score for NOW (day or night)
+  const best = bestOption(options, night) ?? options[0];
+  const recommended: RouteKind = best.kind;
   const [selected, setSelected] = useState<RouteKind>(() => {
-    const k = kind ?? recommended;
+    const k = kind && kind !== 'safest' ? kind : best.kind;
     return options.some((o) => o.kind === k) ? k : options[0].kind;
   });
   const opt = options.find((o) => o.kind === selected) ?? options[0];
   const score = night ? opt.scoreNight : opt.scoreDay;
+  const titleOfOpt = (o: RouteOption) => cardTitle(o, options, night);
   const lmOption = options.find((o) => o.lastMeters);
   const lm = lmOption?.lastMeters ?? null;
 
@@ -500,7 +502,7 @@ function ResultsView({
                   accessibilityElementsHidden={snap !== 'peek'}
                 >
                   <Txt w="black" size={18} numberOfLines={1}>
-                    {opt.durationMin} dəq · {KIND_LABEL[opt.kind]}
+                    {opt.durationMin} dəq · {titleOfOpt(opt)}
                   </Txt>
                   <Txt w="med" size={13.5} color={C.muted} numberOfLines={1}>
                     Çatış {clockPlus(opt.durationMin)} · {fmtDist(opt.distanceM)} · {score} bal
@@ -529,6 +531,7 @@ function ResultsView({
                     night={night}
                     selected={o.kind === opt.kind}
                     recommended={o.kind === recommended}
+                    title={titleOfOpt(o)}
                     onPress={() => pick(o.kind)}
                     onLastMeters={o.lastMeters ? openLastMeters : undefined}
                     ringDelay={fromAhmed ? 380 + i * 90 : 120 + i * 50}
@@ -574,7 +577,7 @@ function ResultsView({
       {/* floating start bar */}
       {!lmOpen ? (
         <ReAnimated.View entering={FadeInDown.springify().damping(18).delay(fromAhmed ? 520 : 200)} style={[styles.ctaBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          <PressableScale accessibilityRole="button" accessibilityLabel={`${KIND_LABEL[opt.kind]} yolla başla`} haptic="medium" scaleTo={0.97} onPress={go} style={styles.cta}>
+          <PressableScale accessibilityRole="button" accessibilityLabel={`${titleOfOpt(opt)} yolla başla`} haptic="medium" scaleTo={0.97} onPress={go} style={styles.cta}>
             <View style={styles.ctaIcon}>
               <Icon name="navigation-variant" size={22} color={C.brand} />
             </View>
@@ -583,7 +586,7 @@ function ResultsView({
                 Başla
               </Txt>
               <Txt w="semi" size={12.5} color="rgba(255,255,255,0.85)" numberOfLines={1}>
-                {KIND_LABEL[opt.kind]} · {opt.durationMin} dəq · çatış {clockPlus(opt.durationMin)}
+                {titleOfOpt(opt)} · {opt.durationMin} dəq · çatış {clockPlus(opt.durationMin)}
               </Txt>
             </View>
             <View style={styles.ctaScore}>

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppStore, useIsNight } from '@/store/useAppStore';
-import { CROSSING_TYPE, LAYER, nearestCrossing, visible } from '@/data/layer';
+import { CF, CROSSING_TYPE, LAYER, crossingFactors, crossingStreet, nearestCrossing, visible } from '@/data/layer';
 import { REPORT_META } from '@/data/reports-seed';
 import { ROUTES } from '@/data/routes';
 import { useMapLook } from '@/components/mapStyle';
@@ -29,7 +29,7 @@ const ME = { latitude: ROUTES.origin.lat, longitude: ROUTES.origin.lon };
 
 type Sel = { kind: 'crossing'; idx: number } | { kind: 'report'; id: string } | null;
 
-const TYPE_ICON = ['traffic-light', 'zebra', 'help-rhombus-outline', 'stairs-down'];
+const TYPE_ICON = ['traffic-light', 'walk', 'help-rhombus-outline', 'stairs-down'];
 
 function Attr({ icon, label, value, tone }: { icon: string; label: string; value: string; tone?: 'safe' | 'warn' | 'danger' }) {
   const fg = tone === 'danger' ? C.danger : tone === 'warn' ? '#8A5A00' : tone === 'safe' ? C.brandDark : C.ink;
@@ -118,7 +118,12 @@ export default function MapScreen() {
   ];
 
   const cardBottom = TAB_BAR_SPACE + 4;
-  const lit = selCrossing ? selCrossing[3] - selCrossing[4] <= 5 : true;
+  const cFlags = selCrossing ? selCrossing[8] ?? 0 : 0;
+  // evidence beyond type / lanes / lighting (school, bus stop, isolated, island, service road)
+  const extraFactors = useMemo(
+    () => (selCrossing ? crossingFactors(selCrossing).slice(1).filter((f) => !/zolaq|İşıq/i.test(f)) : []),
+    [selCrossing],
+  );
   const cScore = selCrossing ? (night ? selCrossing[4] : selCrossing[3]) : 0;
 
   return (
@@ -258,22 +263,32 @@ export default function MapScreen() {
 
       {/* legend pills */}
       {!sel ? (
-        <Animated.View entering={FadeInUp.delay(400).springify().damping(18)} exiting={FadeOut.duration(150)} style={[styles.legend, { bottom: TAB_BAR_SPACE + 10 }]}>
-          {[
-            { n: vis.counts.safe, color: C.safe, label: 'az riskli' },
-            { n: vis.counts.mid, color: C.warn, label: 'orta' },
-            { n: vis.counts.risky, color: C.danger, label: 'riskli' },
-          ].map((x) => (
-            <View key={x.label} style={styles.legendPill}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: x.color, borderWidth: 1.5, borderColor: '#FFFFFF' }} />
-              <Txt w="bold" size={13} style={{ fontVariant: ['tabular-nums'] }}>
-                {x.n}
+        <Animated.View entering={FadeInUp.delay(400).springify().damping(18)} exiting={FadeOut.duration(150)} style={[styles.legend, { bottom: TAB_BAR_SPACE + 10 }]} pointerEvents="none">
+          {night ? (
+            <Animated.View entering={FadeIn.duration(300)} style={styles.nightNote}>
+              <Icon name="weather-night" size={14} color={C.ai} />
+              <Txt w="semi" size={11.5} color={C.ink2} style={{ flexShrink: 1 }}>
+                Gecə: işıqlandırma məlumatı olmayan keçidlər ehtiyatla qiymətləndirilir
               </Txt>
-              <Txt w="med" size={12.5} color={C.muted}>
-                {x.label}
-              </Txt>
-            </View>
-          ))}
+            </Animated.View>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[
+              { n: vis.counts.safe, color: C.safe, label: 'az riskli' },
+              { n: vis.counts.mid, color: C.warn, label: 'orta' },
+              { n: vis.counts.risky, color: C.danger, label: 'riskli' },
+            ].map((x) => (
+              <View key={x.label} style={styles.legendPill}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: x.color, borderWidth: 1.5, borderColor: '#FFFFFF' }} />
+                <Txt w="bold" size={13} style={{ fontVariant: ['tabular-nums'] }}>
+                  {x.n}
+                </Txt>
+                <Txt w="med" size={12.5} color={C.muted}>
+                  {x.label}
+                </Txt>
+              </View>
+            ))}
+          </View>
         </Animated.View>
       ) : null}
 
@@ -297,16 +312,33 @@ export default function MapScreen() {
                     {CROSSING_TYPE[selCrossing[2]]}
                   </Txt>
                   <Txt w="med" size={12.5} color={C.muted} style={{ marginTop: 3 }} numberOfLines={1}>
-                    {nearReport ? `${nearReport.count} bildiriş · ${nearReport.minutesAgo} dəq əvvəl` : 'OpenStreetMap atributları əsasında'}
+                    {[crossingStreet(selCrossing), nearReport ? `${nearReport.count} bildiriş · ${nearReport.minutesAgo} dəq əvvəl` : null].filter(Boolean).join(' · ') ||
+                      'OpenStreetMap atributları əsasında'}
                   </Txt>
                 </View>
                 <ScoreRing key={`${sel?.kind === 'crossing' ? sel.idx : ''}`} score={cScore} size={68} />
               </View>
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
                 <Attr icon={TYPE_ICON[selCrossing[2]] ?? 'help'} label="növ" value={selCrossing[2] === 0 ? 'İşıqfor' : selCrossing[2] === 1 ? 'Zebra' : selCrossing[2] === 3 ? 'Yeraltı' : 'Nişansız'} tone={selCrossing[2] === 0 || selCrossing[2] === 3 ? 'safe' : 'danger'} />
-                <Attr icon="road-variant" label="zolaq" value={selCrossing[5] ? `${selCrossing[5]}` : '—'} tone={selCrossing[5] >= 4 ? 'warn' : undefined} />
-                <Attr icon={lit ? 'lightbulb-on-outline' : 'lightbulb-off-outline'} label="gecə işığı" value={lit ? 'İşıqlı' : 'Zəif'} tone={lit ? 'safe' : 'warn'} />
+                <Attr icon="road-variant" label={(cFlags & CF.LANES_EST) ? 'zolaq · təxmini' : 'zolaq'} value={selCrossing[5] ? `${selCrossing[5]}` : '—'} tone={selCrossing[5] >= 4 ? 'warn' : undefined} />
+                <Attr
+                  icon={cFlags & CF.LIT_YES ? 'lightbulb-on-outline' : cFlags & CF.LIT_NO ? 'lightbulb-off-outline' : 'lightbulb-question-outline'}
+                  label="gecə işığı"
+                  value={cFlags & CF.LIT_YES ? 'İşıqlı' : cFlags & CF.LIT_NO ? 'İşıqsız' : 'Məlum deyil'}
+                  tone={cFlags & CF.LIT_YES ? 'safe' : 'warn'}
+                />
               </View>
+              {extraFactors.length ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                  {extraFactors.map((f) => (
+                    <View key={f} style={styles.factor}>
+                      <Txt w="semi" size={12} color={C.ink2}>
+                        {f}
+                      </Txt>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
               <View style={{ marginTop: 12 }}>
                 <Txt w="semi" size={12.5} color={C.muted} style={{ marginBottom: 6 }}>
                   Risk saatlara görə
@@ -380,7 +412,19 @@ const styles = StyleSheet.create({
   },
   chipIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   controls: { position: 'absolute', right: 14 },
-  legend: { position: 'absolute', left: 14, flexDirection: 'row', gap: 6 },
+  legend: { position: 'absolute', left: 14, right: 14, gap: 6 },
+  nightNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    ...shadow(1),
+  },
+  factor: { paddingHorizontal: 10, height: 28, justifyContent: 'center', borderRadius: 14, backgroundColor: C.surface },
   legendPill: {
     flexDirection: 'row',
     alignItems: 'center',
