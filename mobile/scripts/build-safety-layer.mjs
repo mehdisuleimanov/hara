@@ -366,8 +366,10 @@ async function main() {
   for (const el of sJson.elements) {
     const t = el.tags ?? {};
     if (!(t.station === 'subway' || t.subway === 'yes')) continue;
-    const name = t['name:az'] ?? t.name;
-    if (!name || seen.has(name)) continue;
+    // OSM `name` is the official Azerbaijani station name (name:az is sometimes a variant, e.g. 'Metro elmlər');
+    // exits ('çıxış') and depots ('deposu') carry station tags too and are skipped
+    const name = t.name ?? t['name:az'];
+    if (!name || seen.has(name) || /çıxış|deposu/i.test(name)) continue;
     seen.add(name);
     stations.push({ name, lat: r5(el.lat), lon: r5(el.lon) });
   }

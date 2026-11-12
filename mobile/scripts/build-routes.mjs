@@ -402,6 +402,7 @@ async function main() {
         const out = { mode: l.mode, c: flat(l.pts), distanceM: Math.round(l.distanceM), durationMin: r1(l.durationMin) };
         if (l.label) out.label = l.label;
         if (l.underground) out.underground = true;
+        if (l.indoor) out.indoor = true;
         if (l.stations) out.stations = l.stations;
         return out;
       }),
@@ -747,6 +748,10 @@ async function main() {
       lastMeters,
     });
 
+    // honest timing: when the metro beats the taxi, say so instead of pretending
+    if (!fastest.warning && safest.durationMin < fastest.durationMin && safest.legs.some((l) => l.mode === 'metro')) {
+      fastest.warning = `Metro ${fastest.durationMin - safest.durationMin} dəq daha tez çatdırır`;
+    }
     const all = [safest, cheapest, fastest];
     safest.avoided = Math.max(0, Math.max(cheapest._s.riskyNight, fastest._s.riskyNight + (lastMeters ? 1 : 0)) - safest._s.riskyNight);
     const meta = safest._metro;
@@ -787,11 +792,12 @@ async function main() {
     legs: aLegs.map((l) => {
       const o = { mode: l.mode, c: flat(l.pts), distanceM: Math.round(l.distanceM) };
       if (l.underground) o.underground = true;
+      if (l.indoor) o.indoor = true;
       if (l.stations) o.stations = l.stations;
       if (l.label) o.label = l.label;
       return o;
     }),
-    stations: am.legs.filter((l) => l.stations).flatMap((l, i) => l.stations.map((s) => s.name).slice(i ? 1 : 0)),
+    stations: am.legs.filter((l) => l.stations).flatMap((l) => l.stations.map((s) => s.name)),
   };
 
   // ---------- FAMILY: Murad's school route, Nənə's walk home (Nərimanov)
