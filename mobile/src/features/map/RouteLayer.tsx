@@ -13,9 +13,9 @@ import { crossingsAlong, isUnderground, legFraction, legGeos, legLatLngs, legSta
 export const StationMarker = memo(function StationMarker({ s, major, dark }: { s: Station; major: boolean; dark?: boolean }) {
   if (!major) {
     return (
-      <SnapMarker coordinate={{ latitude: s.lat, longitude: s.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={24}>
+      <Marker tracksViewChanges={false} coordinate={{ latitude: s.lat, longitude: s.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={24}>
         <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: C.underground }} />
-      </SnapMarker>
+      </Marker>
     );
   }
   return (
@@ -60,11 +60,11 @@ export const StationMarker = memo(function StationMarker({ s, major, dark }: { s
 export const CrossingDot = memo(function CrossingDot({ lat, lon, score, big }: { lat: number; lon: number; score: number; big?: boolean }) {
   const s = big ? 16 : 12;
   return (
-    <SnapMarker coordinate={{ latitude: lat, longitude: lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={18}>
+    <Marker tracksViewChanges={false} coordinate={{ latitude: lat, longitude: lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={18}>
       <View style={{ width: s + 6, height: s + 6, alignItems: 'center', justifyContent: 'center' }}>
         <View style={{ width: s, height: s, borderRadius: s / 2, backgroundColor: scoreColor(score), borderWidth: 2.5, borderColor: '#FFFFFF' }} />
       </View>
-    </SnapMarker>
+    </Marker>
   );
 });
 

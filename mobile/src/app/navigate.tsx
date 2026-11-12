@@ -532,10 +532,10 @@ export default function Navigate() {
                 Qarşı tərəfdə düşürür · {lmAlert.lanes} zolaq
               </Txt>
               <Txt w="semi" size={13} color="#B4232A" style={{ marginTop: 2 }}>
-                Keçməyə tələsmə, işıqforlu keçidə aparacağam
+                Birbaşa keçmə, {lmAlert.crossing?.type === 3 ? 'yeraltı keçidə' : 'işıqforlu keçidə'} aparacağam
               </Txt>
             </View>
-            <Icon name="traffic-light" size={26} color={C.brandDark} />
+            <Icon name={lmAlert.crossing?.type === 3 ? 'stairs-down' : 'traffic-light'} size={26} color={C.brandDark} />
           </View>
         </Animated.View>
       ) : null}

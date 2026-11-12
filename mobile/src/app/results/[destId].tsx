@@ -557,7 +557,10 @@ function ResultsView({
                       Son 50 metr
                     </Txt>
                     <Txt w="bold" size={14.5} style={{ marginTop: 2 }} numberOfLines={2}>
-                      Taksi səni {lm.street} üzərində, girişin qarşı tərəfində düşürür
+                      Taksi səni girişin qarşı tərəfində düşürür
+                    </Txt>
+                    <Txt w="semi" size={12.5} color={C.muted} style={{ marginTop: 2 }} numberOfLines={1}>
+                      {lm.street} · {lm.lanes} zolaq · {lm.crossing?.type === 3 ? 'yeraltı keçidlə' : 'işıqforlu keçidlə'} +{Math.max(1, lm.extraMin)} dəq
                     </Txt>
                   </View>
                   <Icon name="chevron-right" size={22} color={C.danger} />

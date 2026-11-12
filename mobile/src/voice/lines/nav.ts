@@ -20,7 +20,7 @@ export const NAV = {
   busBoard: 'Avtobusa min. Dayanacaqları sənin üçün sayıram.',
   busNext: 'Növbəti dayanacaqda düşürsən.',
   taxiBoard: 'Taksiyə otur. Düşmə nöqtəsini mən izləyirəm.',
-  taxiWrongSide: 'Diqqət, taksi səni qarşı tərəfdə düşürəcək. Keçməyə tələsmə, səni işıqforlu keçidə aparacağam.',
+  taxiWrongSide: 'Diqqət, taksi səni qarşı tərəfdə düşürəcək. Birbaşa keçmə, səni ən yaxın yeraltı və ya işıqforlu keçidə aparacağam.',
   almost: 'Az qaldı, demək olar ki, çatdın.',
   dropMoved: 'Düşmə nöqtəsini dəyişdim. İndi giriş elə sənin tərəfindədir.',
   sentToDriver: 'Yeni düşmə nöqtəsini sürücüyə göndərdim.',
