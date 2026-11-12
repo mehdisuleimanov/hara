@@ -1,11 +1,22 @@
 import type { LatLng } from './types';
 
-/** [lat, lon, type, scoreDay, scoreNight, lanes]; type: 0 signals, 1 zebra, 2 unmarked, 3 underground */
-export type CrossingT = [number, number, number, number, number, number];
+/**
+ * [lat, lon, type, scoreDay, scoreNight, lanes, roadAxisDeg?, nameIdx?]
+ * type: 0 signals, 1 zebra, 2 unmarked, 3 grade-separated (underpass / footbridge)
+ * roadAxisDeg: axis of the crossed road, 0–179 (−1 unknown); nameIdx: index into LAYER.names (−1 unnamed).
+ * Scores come from the iRAP-inspired attribute model in scripts/build-safety-layer.mjs (no random terms).
+ */
+export type CrossingT = [number, number, number, number, number, number, number?, number?];
 /** k: road class 0 trunk .. 5 pedestrian; d/n: day/night score; c: flat coords */
 export type SegmentT = { k: number; d: number; n: number; c: number[] };
 
-type Layer = { crossings: CrossingT[]; segments: SegmentT[]; stations: { name: string; lat: number; lon: number }[] };
+type Layer = {
+  crossings: CrossingT[];
+  segments: SegmentT[];
+  stations: { name: string; lat: number; lon: number }[];
+  /** street names referenced by CrossingT[7] */
+  names?: string[];
+};
 
 /**
  * PERF: the 1.6 MB layer is parsed lazily on first access (not at app start).
@@ -26,7 +37,16 @@ export const LAYER = {
   get stations() {
     return load().stations;
   },
+  get names(): string[] {
+    return load().names ?? [];
+  },
 };
+
+/** Street the crossing is on (e.g. "Neftçilər prospekti"), or null when unnamed. */
+export function crossingStreet(c: CrossingT): string | null {
+  const i = c[7];
+  return i != null && i >= 0 ? (LAYER.names[i] ?? null) : null;
+}
 
 /** PERF: cache LatLng arrays per segment so re-renders don't rebuild them. */
 const segCoordCache = new Map<number, LatLng[]>();
