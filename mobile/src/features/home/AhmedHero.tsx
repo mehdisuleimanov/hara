@@ -43,7 +43,7 @@ export function AhmedHero({ line }: { line: string }) {
               <AhmedAvatar size={104} full glow={false} mood={talking ? 'talk' : 'smile'} />
             </Float>
           </PressableScale>
-          <View style={styles.bubble}>
+          <PressableScale scaleTo={0.98} accessibilityRole="button" accessibilityLabel={line} accessibilityHint="Səsli oxu" onPress={() => say(line)} style={styles.bubble}>
             <View style={styles.tail} />
             <Txt w="semi" size={15} lh={21} color={C.ink}>
               {shown}
@@ -51,7 +51,13 @@ export function AhmedHero({ line }: { line: string }) {
                 {line.slice(shown.length)}
               </Txt>
             </Txt>
-          </View>
+            <View style={styles.speak}>
+              <Icon name={talking ? 'volume-high' : 'volume-medium'} size={15} color={C.ai} />
+              <Txt w="bold" size={11.5} color={C.ai}>
+                {talking ? 'Danışır…' : 'Dinlə'}
+              </Txt>
+            </View>
+          </PressableScale>
         </View>
 
         <PressableScale
@@ -129,6 +135,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
     borderRadius: 2,
   },
+  speak: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, alignSelf: 'flex-start', backgroundColor: C.aiSoft, borderRadius: R.pill, paddingHorizontal: 9, height: 24 },
   voice: {
     marginTop: 10,
     height: 72,

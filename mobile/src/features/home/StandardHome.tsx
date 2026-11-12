@@ -9,7 +9,7 @@ import { Avatar, HaraWordmark } from '@/components/Brand';
 import { DevTrigger } from '@/components/DevTrigger';
 import { Icon, Txt } from '@/components/ui';
 import { useTabBarSpace } from '@/components/TabBar';
-import { PressableScale, Skeleton, enter } from '@/motion';
+import { PressableScale, enter } from '@/motion';
 import { C, R } from '@/theme';
 import { AhmedHero } from './AhmedHero';
 import { FeatureGrid } from './FeatureGrid';
@@ -63,7 +63,7 @@ export function StandardHome() {
               </Txt>
             </View>
           ) : (
-            <Skeleton width={112} height={40} radius={20} />
+            <View style={[styles.weather, { width: 112 }]} />
           )}
           <PressableScale accessibilityRole="button" accessibilityLabel="Profil" scaleTo={0.9} onPress={() => router.navigate('/profile')}>
             <Avatar size={44} />

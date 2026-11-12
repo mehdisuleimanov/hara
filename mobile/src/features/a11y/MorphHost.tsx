@@ -69,6 +69,8 @@ export function A11yMorphHost() {
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const sizeRef = useRef(size);
   sizeRef.current = size;
+  const hostRef = useRef<React.ComponentRef<typeof View>>(null);
+  const offset = useRef({ x: 0, y: 0 }); // host position in the window (web phone frame)
 
   const grow = useSharedValue(0); // circle scale 0..1
   const fade = useSharedValue(0); // whole overlay opacity
@@ -90,8 +92,8 @@ export function A11yMorphHost() {
       const { w, h } = sizeRef.current;
       const W = w || 400;
       const H = h || 800;
-      const ox = Math.max(0, Math.min(W, origin?.x ?? W / 2));
-      const oy = Math.max(0, Math.min(H, origin?.y ?? H / 2));
+      const ox = Math.max(0, Math.min(W, origin ? origin.x - offset.current.x : W / 2));
+      const oy = Math.max(0, Math.min(H, origin ? origin.y - offset.current.y : H / 2));
       const radius = Math.ceil(Math.max(Math.hypot(ox, oy), Math.hypot(W - ox, oy), Math.hypot(ox, H - oy), Math.hypot(W - ox, H - oy))) + 8;
       const lite = p.liteFx;
       grow.value = lite ? 1 : 0.01;
@@ -147,13 +149,16 @@ export function A11yMorphHost() {
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (width !== size.w || height !== size.h) setSize({ w: width, h: height });
+    hostRef.current?.measureInWindow?.((x: number, y: number) => {
+      if (Number.isFinite(x) && Number.isFinite(y)) offset.current = { x, y };
+    });
   };
 
   const m = run ? META[run.mode] : null;
   const dark = run?.mode === 'lowVision';
 
   return (
-    <View pointerEvents={run ? 'auto' : 'none'} onLayout={onLayout} style={[StyleSheet.absoluteFill, { zIndex: Z.morph, elevation: Z.morph }]}>
+    <View ref={hostRef} pointerEvents={run ? 'auto' : 'none'} onLayout={onLayout} style={[StyleSheet.absoluteFill, { zIndex: Z.morph, elevation: Z.morph }]}>
       {run && m ? (
         <Animated.View style={[StyleSheet.absoluteFill, fadeA]}>
           {run.lite ? (

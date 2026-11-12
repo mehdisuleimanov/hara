@@ -103,7 +103,7 @@ export function SimpleHome() {
                 Əhmədlə danış
               </Txt>
               <Txt w="semi" size={15} color="rgba(255,255,255,0.9)" style={{ marginTop: 4 }}>
-                Toxun və danış
+                Toxun, mən dinləyirəm
               </Txt>
             </View>
           </PressableScale>
