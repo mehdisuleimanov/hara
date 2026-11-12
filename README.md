@@ -48,6 +48,17 @@ npm run data:routes   # src/data/routes.json faylını yaradır (FOSSGIS OSRM)
 npm run smoke:gemini  # Gemini açarını və modelini yoxlayır
 ```
 
+Xam OSM və OSRM cavabları `mobile/scripts/.cache/` qovluğunda saxlanılır (12 noyabr 2026 tarixli snapshot). Ona görə `data:layer` və `data:routes` əmrləri internet olmadan da eyni nəticəni verir.
+
+## APK
+
+`.github/workflows/android-apk.yml` workflow-u Expo hesabı olmadan APK yığır: `expo prebuild` → Gradle `assembleRelease` (arm64). Workflow-u Actions → "Android APK" → Run workflow ilə işə salmaq olar. Lazım olan secret-lər: `GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`.
+
+## Sənədlər
+
+- [`docs/spec-plan.md`](docs/spec-plan.md): spec müsahibəsinin nəticəsi, qəbul olunan fərziyyələr, risklər və icra planı.
+- [`docs/design/mockups-v1/`](docs/design/mockups-v1/): ilkin konsepsiya maketləri (qaranlıq mövzu). Sonradan dizayn ağ və #FF6203 rənglərinə keçirildi.
+
 ## Qeydlər
 
 - Gemini açarı demo üçün tətbiqin içinə yığılır (`EXPO_PUBLIC_`). Açarda xərc limiti qoy və **demodan sonra açarı dəyiş**.
