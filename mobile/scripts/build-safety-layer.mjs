@@ -1,8 +1,60 @@
-// Dev-time only: turns cached OSM data into the app's "Bakı Təhlükəsizlik Qatı".
-// Scores are PROTOTYPE rules (iRAP-inspired attributes), not a validated model.
-// Usage: node scripts/build-safety-layer.mjs
+// Dev-time only: turns cached OpenStreetMap data into the app's "Bakı Təhlükəsizlik Qatı"
+// (src/data/safety-layer.json). Usage: node scripts/build-safety-layer.mjs
+//
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// SCORING MODEL (iRAP-inspired, deterministic — every point comes from an OSM attribute)
+// Scores are 0–100, higher = lower pedestrian risk. 75+ lower risk · 55–74 moderate · <55 high.
+// It is a transparent rule-based prior in the spirit of iRAP Star Rating for pedestrians
+// (crossing facility, lanes to cross, operating speed, sidewalk provision, street lighting,
+// vulnerable users nearby). It is NOT a calibrated crash model; weights are documented below.
+//
+// Inputs per crossing (OSM): crossing facility (node tags + `footway=crossing` way tags +
+// traffic-signal nodes ≤20 m on the same road), crossed road class / `lanes` / `maxspeed` /
+// `lit`, refuge island (`crossing:island`), street lamps ≤30 m, bus stops ≤30 m, schools /
+// kindergartens ≤150 m, distance to the nearest signalised / grade-separated crossing.
+//
+// Missing data is treated conservatively ("no data = risky"):
+//   lanes missing   → class default rounded UP (trunk 6/3 one-way, primary 4/3, secondary 4/2,
+//                     tertiary 2) and −2 "unverified"
+//   maxspeed missing→ class default (trunk 70, primary/secondary 60, tertiary 50, residential 40)
+//   lit missing     → night penalty sits between lit=yes and lit=no (unless a street lamp ≤30 m)
+//   crossing type   → an untyped `highway=crossing` counts as UNMARKED
+//   no public road  → crossing on a service road / parking aisle: 2 lanes, 30 km/h, unverified
+//
+// CROSSING  day = BASE[facility]
+//                 − LANE_W[f] × max(0, lanes − 2)          exposure time in the carriageway
+//                 − SPEED_W[f] × max(0, speed − 30)         WHO/iRAP: fatality risk climbs fast >30 km/h
+//                 + ISLAND[f] (refuge island = two-stage crossing)
+//                 − 4 bus stop ≤30 m (buses mask pedestrians)   [unsignalised only]
+//                 − 4/5 school/kindergarten ≤150 m (children)    [unsignalised only]
+//                 − 3 nearest signalised/grade-separated crossing >250 m on a ≥4-lane road
+//                 − 2 lanes unverified
+//           night = day − NIGHT[f][lit]
+//   facility       BASE  LANE_W SPEED_W ISLAND  NIGHT lit=yes / unknown / no
+//   grade-sep.      92     0      0       0          3     /   6     /  12   (personal security)
+//   signals         88     1.5    0.15    2          3     /   6     /  14
+//   zebra           74     5      0.45    6          6     /  12     /  22
+//   unmarked        64     6      0.55    5          8     /  14     /  24
+//
+// SEGMENT (walking along a road)
+//   base = 90 sidewalk mapped · 50 sidewalk=no on ≥40 km/h roads (72 on low-speed streets) ·
+//          unknown: 94 pedestrian street, 88 living street, 82 residential/unclassified, 80 other
+//   day  = base − 0.25 × max(0, speed − 30) − 2 × max(0, lanes − 2)
+//   night= day − (lit=yes or lamp ≤25 m: 3 · lit=no: 25 · unknown: 8 trunk/primary, 10 secondary/
+//          tertiary, 16 residential & smaller)
+// All scores clamped to [5, 97]. Route-level (weakest-link) scoring lives in
+// src/features/routing/scoring.ts and is shared by the build scripts and on-device live routing.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+//
+// Output tuples (src/data/layer.ts):
+//   crossings: [lat, lon, type, day, night, lanes, roadBearingDeg, nameIdx, evidenceFlags]
+//              type 0 signals · 1 zebra · 2 unmarked · 3 grade-separated (underpass/footbridge)
+//   segments:  { k: class 0 trunk … 5 pedestrian, d, n, c: flat [lat,lon,…] }
+//   names:     street names referenced by crossings[7] (−1 = unnamed)
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { loadMetroGraph, RED, GREEN, findStation } from './lib/metro.mjs';
+import { F, DEFAULT_SPEED, T_SIGNALS, T_ZEBRA, T_UNMARKED, T_GRADE, crossingScore } from './lib/irap.mjs';
 
 const CACHE = path.resolve('scripts/.cache');
 const OUT = path.resolve('src/data/safety-layer.json');
@@ -11,39 +63,55 @@ const CLASS_CODE = {
   trunk: 0, trunk_link: 0, primary: 1, primary_link: 1, secondary: 2, secondary_link: 2,
   tertiary: 3, tertiary_link: 3, unclassified: 4, residential: 4, living_street: 5, pedestrian: 5,
 };
-const CLASS_BASE = {
-  trunk: 38, trunk_link: 42, primary: 52, primary_link: 55, secondary: 62, secondary_link: 64,
-  tertiary: 70, tertiary_link: 70, unclassified: 72, residential: 80, living_street: 88, pedestrian: 92,
-};
-// crossing type codes used by the app
-export const T_SIGNALS = 0, T_ZEBRA = 1, T_UNMARKED = 2, T_UNDERGROUND = 3;
+const CLASS_RANK = { trunk: 9, trunk_link: 8, primary: 7, primary_link: 6, secondary: 5, secondary_link: 4, tertiary: 3, tertiary_link: 3, unclassified: 2, residential: 2, living_street: 1, pedestrian: 0 };
 
+
+// evidence flags (crossings[8]) so the app can explain every score: see layer.ts crossingFactors()
+const F_LIT_YES = 1, F_LIT_NO = 2, F_BUS = 4, F_SCHOOL = 8, F_ISOLATED = 16, F_ISLAND = 32, F_LANES_EST = 64, F_SERVICE = 128, F_LAMP = 256;
 const r5 = (v) => Math.round(v * 1e5) / 1e5;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const jit = (id) => {
-  const x = Math.sin(Number(String(id).slice(-9)) * 12.9898) * 43758.5453;
-  return x - Math.floor(x); // 0..1 deterministic per OSM id
-};
-
-function lanesOf(tags, cls) {
-  const l = parseInt(tags?.lanes, 10);
-  if (Number.isFinite(l) && l > 0) return l;
-  // missing data -> conservative default by road class
-  if (cls === 'trunk' || cls === 'primary') return 4;
-  if (cls === 'secondary') return 3;
-  return 2;
-}
+const toRad = (d) => (d * Math.PI) / 180;
 
 function hav(aLat, aLon, bLat, bLon) {
-  const R = 6371000, dLat = ((bLat - aLat) * Math.PI) / 180, dLon = ((bLon - aLon) * Math.PI) / 180;
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  const R = 6371000, dLat = toRad(bLat - aLat), dLon = toRad(bLon - aLon);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(s));
+}
+/** bearing a→b in degrees folded to [0,180) (road axis, direction-less) */
+function axis(aLat, aLon, bLat, bLon) {
+  const dy = bLat - aLat, dx = (bLon - aLon) * Math.cos(toRad(aLat));
+  let b = (Math.atan2(dx, dy) * 180) / Math.PI;
+  b = ((b % 180) + 180) % 180;
+  return Math.round(b);
+}
+
+/** point grid for radius queries */
+function pointIndex(items, cell = 0.001) {
+  const g = new Map();
+  for (const it of items) {
+    const k = `${Math.floor(it.lat / cell)}:${Math.floor(it.lon / cell)}`;
+    if (!g.has(k)) g.set(k, []);
+    g.get(k).push(it);
+  }
+  return {
+    near(lat, lon, r) {
+      const span = Math.ceil(r / (cell * 85000));
+      const ci = Math.floor(lat / cell), cj = Math.floor(lon / cell);
+      const out = [];
+      for (let i = -span; i <= span; i++) for (let j = -span; j <= span; j++)
+        for (const it of g.get(`${ci + i}:${cj + j}`) ?? []) {
+          const d = hav(lat, lon, it.lat, it.lon);
+          if (d <= r) out.push({ it, d });
+        }
+      return out.sort((a, b) => a.d - b.d);
+    },
+  };
 }
 
 // Douglas-Peucker in local meters
 function simplify(pts, tol) {
   if (pts.length <= 2) return pts;
-  const lat0 = (pts[0].lat * Math.PI) / 180;
+  const lat0 = toRad(pts[0].lat);
   const xy = pts.map((p) => [p.lon * 111320 * Math.cos(lat0), p.lat * 110540]);
   const keep = new Uint8Array(pts.length);
   keep[0] = keep[pts.length - 1] = 1;
@@ -62,6 +130,38 @@ function simplify(pts, tol) {
   return pts.filter((_, i) => keep[i]);
 }
 
+/** distance from p to segment a-b in meters + projected point */
+function distToSeg(lat, lon, a, b) {
+  const k = Math.cos(toRad(lat));
+  const ax = (a.lon - lon) * 111320 * k, ay = (a.lat - lat) * 110540;
+  const bx = (b.lon - lon) * 111320 * k, by = (b.lat - lat) * 110540;
+  const dx = bx - ax, dy = by - ay;
+  const L = dx * dx + dy * dy || 1e-9;
+  const t = clamp(-(ax * dx + ay * dy) / L, 0, 1);
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+
+const isOneway = (t) => t?.oneway === 'yes' || t?.oneway === '1' || t?.junction === 'roundabout';
+function roadLanes(t, cls) {
+  const l = parseInt(t?.lanes, 10);
+  if (Number.isFinite(l) && l > 0) return { lanes: l, verified: true };
+  const ow = isOneway(t);
+  const def = { trunk: ow ? 3 : 6, trunk_link: ow ? 2 : 3, primary: ow ? 3 : 4, primary_link: 2, secondary: ow ? 2 : 4, secondary_link: 2 }[cls] ?? 2;
+  return { lanes: def, verified: false };
+}
+function roadSpeed(t, cls) {
+  const m = parseInt(t?.maxspeed, 10);
+  return Number.isFinite(m) && m > 0 ? m : DEFAULT_SPEED[cls] ?? 50;
+}
+const SIDEWALK_YES = new Set(['both', 'left', 'right', 'yes', 'separate']);
+function sidewalkOf(t) {
+  const v = t?.sidewalk ?? t?.['sidewalk:both'];
+  if (v) return v === 'no' || v === 'none' ? 'no' : SIDEWALK_YES.has(v) ? 'yes' : 'unknown';
+  if (SIDEWALK_YES.has(t?.['sidewalk:left']) || SIDEWALK_YES.has(t?.['sidewalk:right'])) return 'yes';
+  if (t?.['sidewalk:left'] === 'no' && t?.['sidewalk:right'] === 'no') return 'no';
+  return 'unknown';
+}
+
 async function main() {
   const files = (await fs.readdir(CACHE)).filter((f) => f.startsWith('tile-'));
   const nodes = new Map();
@@ -73,122 +173,242 @@ async function main() {
       else if (el.type === 'way') ways.set(el.id, el);
     }
   }
-  console.log(`raw: ${nodes.size} nodes, ${ways.size} ways from ${files.length} tiles`);
+  const extras = JSON.parse(await fs.readFile(path.join(CACHE, 'extras.json'), 'utf8')).elements;
+  const sJson = JSON.parse(await fs.readFile(path.join(CACHE, 'stations.json'), 'utf8'));
+  console.log(`raw: ${nodes.size} nodes, ${ways.size} ways from ${files.length} tiles, ${extras.length} extras`);
 
-  // road info per node (for crossing lanes / class / lighting)
-  const nodeRoad = new Map();
+  const pos = (e) => (e.center ? { lat: e.center.lat, lon: e.center.lon } : e.lat != null ? { lat: e.lat, lon: e.lon } : null);
+  const lamps = pointIndex(extras.filter((e) => e.tags?.highway === 'street_lamp').map(pos));
+  const schools = pointIndex(extras.filter((e) => /^(school|kindergarten)$/.test(e.tags?.amenity ?? '')).map(pos).filter(Boolean));
+  const busStops = pointIndex(sJson.elements.filter((e) => e.tags?.highway === 'bus_stop').map(pos));
+  const crossingWays = extras.filter((e) => e.type === 'way' && e.tags?.footway === 'crossing' && e.center);
+  const footbridges = extras.filter((e) => e.type === 'way' && e.tags?.bridge === 'yes' && e.tags?.highway === 'footway' && e.center);
+
+  // ---- road ways: per-node membership + segment index for nearest-road lookups
+  const names = [];
+  const nameIdx = new Map();
+  const nameOf = (t) => {
+    const n = t?.['name:az'] ?? t?.name;
+    if (!n) return -1;
+    if (!nameIdx.has(n)) { nameIdx.set(n, names.length); names.push(n); }
+    return nameIdx.get(n);
+  };
+  const roadInfo = (w) => {
+    const cls = w.tags.highway;
+    const { lanes, verified } = roadLanes(w.tags, cls);
+    return { w, cls, lanes, lanesVerified: verified, speed: roadSpeed(w.tags, cls), lit: w.tags.lit === 'yes' ? 'yes' : w.tags.lit === 'no' ? 'no' : 'unknown', name: nameOf(w.tags) };
+  };
+  const nodeRoads = new Map();
+  const roadSegs = []; // {a,b,info}
   const segments = [];
-  const underground = [];
+  const tunnels = [];
   for (const w of ways.values()) {
     const cls = w.tags?.highway;
     if (cls === 'footway') {
-      if (w.geometry?.length) {
-        const mid = w.geometry[Math.floor(w.geometry.length / 2)];
-        underground.push({ id: w.id, lat: mid.lat, lon: mid.lon });
-      }
+      if (w.geometry?.length) tunnels.push(w);
       continue;
     }
-    if (!(cls in CLASS_BASE) || !w.geometry?.length) continue;
-    const lanes = lanesOf(w.tags, cls);
-    const lit = w.tags?.lit;
-    if (cls !== 'pedestrian') {
-      for (const nid of w.nodes ?? []) {
-        const prev = nodeRoad.get(nid);
-        if (!prev || lanes > prev.lanes || CLASS_BASE[cls] < CLASS_BASE[prev.cls]) nodeRoad.set(nid, { cls, lanes, lit });
-      }
+    if (!(cls in CLASS_CODE) || !w.geometry?.length) continue;
+    const info = roadInfo(w);
+    if (cls !== 'pedestrian' && cls !== 'living_street') {
+      (w.nodes ?? []).forEach((nid, i) => {
+        if (!nodeRoads.has(nid)) nodeRoads.set(nid, []);
+        nodeRoads.get(nid).push({ info, i });
+      });
+      for (let i = 1; i < w.geometry.length; i++) roadSegs.push({ a: w.geometry[i - 1], b: w.geometry[i], info });
     }
-    // segment score
-    let day = CLASS_BASE[cls];
-    if (lanes >= 6) day -= 12; else if (lanes >= 4) day -= 6;
-    const ms = parseInt(w.tags?.maxspeed, 10);
-    if (ms >= 60) day -= 6;
-    const sw = w.tags?.sidewalk ?? w.tags?.['sidewalk:both'];
-    if (sw === 'no' || sw === 'none') day -= 14;
-    else if (sw) day += 4;
-    else day -= 2; // missing data counts against
-    day = clamp(Math.round(day + (jit(w.id) - 0.5) * 8), 15, 96);
-    const nightPenalty = lit === 'yes' ? 3 : lit === 'no' ? 26 : cls === 'residential' || cls === 'unclassified' ? 16 : 9;
-    const night = clamp(day - nightPenalty, 8, 96);
+
+    // ---- segment score (walking along)
+    const sw = sidewalkOf(w.tags);
+    let base;
+    if (sw === 'yes') base = 90;
+    else if (sw === 'no') base = info.speed >= 40 ? 50 : 72;
+    else base = cls === 'pedestrian' ? 94 : cls === 'living_street' ? 88 : cls === 'residential' || cls === 'unclassified' ? 82 : 80;
+    const day = clamp(base - 0.25 * Math.max(0, info.speed - 30) - 2 * Math.max(0, info.lanes - 2), 5, 97);
+    const mid = w.geometry[Math.floor(w.geometry.length / 2)];
+    let lit = info.lit;
+    if (lit === 'unknown' && lamps.near(mid.lat, mid.lon, 25).length) lit = 'yes';
+    const major = cls.startsWith('trunk') || cls.startsWith('primary');
+    const minor = cls.startsWith('secondary') || cls.startsWith('tertiary');
+    const nightPen = lit === 'yes' ? 3 : lit === 'no' ? 25 : major ? 8 : minor ? 10 : 16;
     const simp = simplify(w.geometry, 4);
     const c = [];
     for (const p of simp) c.push(r5(p.lat), r5(p.lon));
-    segments.push({ k: CLASS_CODE[cls], d: day, n: night, c });
+    segments.push({ k: CLASS_CODE[cls], d: Math.round(day), n: Math.round(clamp(day - nightPen, 5, 97)), c });
   }
-
-  // traffic-signal nodes (to upgrade nearby crossings)
-  const signalNodes = [...nodes.values()].filter((n) => n.tags?.highway === 'traffic_signals');
-  const sigGrid = new Map();
-  const key = (lat, lon) => `${Math.floor(lat * 2000)}:${Math.floor(lon * 2000)}`; // ~55m cells
-  for (const s of signalNodes) {
-    const k = key(s.lat, s.lon);
-    if (!sigGrid.has(k)) sigGrid.set(k, []);
-    sigGrid.get(k).push(s);
-  }
-  const nearSignal = (lat, lon) => {
-    const ci = Math.floor(lat * 2000), cj = Math.floor(lon * 2000);
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-      for (const s of sigGrid.get(`${ci + i}:${cj + j}`) ?? []) if (hav(lat, lon, s.lat, s.lon) < 25) return true;
+  // grid over road segments
+  const RS_CELL = 0.002;
+  const rsGrid = new Map();
+  roadSegs.forEach((s, i) => {
+    const i0 = Math.floor(Math.min(s.a.lat, s.b.lat) / RS_CELL), i1 = Math.floor(Math.max(s.a.lat, s.b.lat) / RS_CELL);
+    const j0 = Math.floor(Math.min(s.a.lon, s.b.lon) / RS_CELL), j1 = Math.floor(Math.max(s.a.lon, s.b.lon) / RS_CELL);
+    for (let a = i0; a <= i1; a++) for (let b = j0; b <= j1; b++) {
+      const k = `${a}:${b}`;
+      if (!rsGrid.has(k)) rsGrid.set(k, []);
+      rsGrid.get(k).push(i);
     }
-    return false;
+  });
+  /** most exposed road within r meters of a point (for crossings not on a road node) */
+  const nearestRoad = (lat, lon, r = 14) => {
+    const ci = Math.floor(lat / RS_CELL), cj = Math.floor(lon / RS_CELL);
+    let best = null;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++)
+      for (const i of rsGrid.get(`${ci + a}:${cj + b}`) ?? []) {
+        const s = roadSegs[i];
+        const d = distToSeg(lat, lon, s.a, s.b);
+        if (d > r) continue;
+        const rank = CLASS_RANK[s.info.cls] * 10 + s.info.lanes - d / 10;
+        if (!best || rank > best.rank) best = { s, d, rank };
+      }
+    return best && { info: best.s.info, bearing: axis(best.s.a.lat, best.s.a.lon, best.s.b.lat, best.s.b.lon) };
+  };
+  /** most exposed road through an OSM node */
+  const roadAtNode = (n) => {
+    const list = nodeRoads.get(n.id);
+    if (!list?.length) return nearestRoad(n.lat, n.lon);
+    list.sort((x, y) => CLASS_RANK[y.info.cls] - CLASS_RANK[x.info.cls] || y.info.lanes - x.info.lanes);
+    const { info, i } = list[0];
+    const g = info.w.geometry;
+    const a = g[Math.max(0, i - 1)], b = g[Math.min(g.length - 1, i + 1)];
+    return { info, bearing: axis(a.lat, a.lon, b.lat, b.lon) };
   };
 
-  const crossings = [];
+  // ---- traffic signals (per node, with the road they sit on)
+  const signalPts = pointIndex([...nodes.values()].filter((n) => n.tags?.highway === 'traffic_signals').map((n) => ({ lat: n.lat, lon: n.lon, id: n.id })));
+
+  // ---- candidate crossings: OSM crossing nodes, upgraded/extended by `footway=crossing` ways
+  const cand = [];
   for (const n of nodes.values()) {
     const t = n.tags ?? {};
     const isCrossing = t.highway === 'crossing' || (t.crossing && t.highway !== 'traffic_signals') || (t.highway === 'traffic_signals' && t.crossing);
-    if (!isCrossing) continue;
-    if (t.crossing === 'no') continue;
-    const road = nodeRoad.get(n.id);
-    const cls = road?.cls ?? 'residential';
-    const lanes = road?.lanes ?? 2;
-    const lit = road?.lit;
-    let type;
-    if (t.crossing === 'traffic_signals' || t.highway === 'traffic_signals' || t['crossing:signals'] === 'yes' || ['pelican', 'toucan', 'puffin'].includes(t.crossing_ref) || nearSignal(n.lat, n.lon)) type = T_SIGNALS;
-    else if (['marked', 'zebra', 'uncontrolled'].includes(t.crossing) || t.crossing_ref === 'zebra' || t['crossing:markings']) type = T_ZEBRA;
-    else type = T_UNMARKED;
-
-    const j = jit(n.id);
-    const lanePen = lanes >= 6 ? 22 : lanes >= 4 ? 12 : lanes === 3 ? 6 : 0;
-    const classPen = cls === 'trunk' || cls === 'primary' ? 8 : 0;
-    let day, night;
-    if (type === T_SIGNALS) {
-      day = 82 + j * 12 - (lanes >= 6 ? 4 : 0);
-      night = day - (lit === 'no' ? 14 : lit === 'yes' ? 3 : 7);
-    } else if (type === T_ZEBRA) {
-      day = clamp(72 - lanePen - classPen - j * 10, 26, 72);
-      night = day - (lit === 'yes' ? 6 : lit === 'no' ? 22 : 14);
-    } else {
-      day = clamp(44 - lanePen * 0.6 - classPen - j * 14, 12, 46);
-      night = day - 12;
-    }
-    crossings.push([r5(n.lat), r5(n.lon), type, Math.round(day), Math.round(clamp(night, 6, 96)), lanes]);
+    if (!isCrossing || t.crossing === 'no') continue;
+    cand.push({ lat: n.lat, lon: n.lon, tags: { ...t }, node: n });
   }
-  for (const u of underground) {
-    const j = jit(u.id);
-    const day = 74 + j * 8;
-    crossings.push([r5(u.lat), r5(u.lon), T_UNDERGROUND, Math.round(day), Math.round(day - 8), 0]);
+  const candIdx = pointIndex(cand);
+  let upgraded = 0, added = 0;
+  for (const cw of crossingWays) {
+    const t = cw.tags;
+    if (t.tunnel === 'yes' || t.bridge === 'yes' || t.layer === '-1') continue; // grade separated, handled below
+    const hit = candIdx.near(cw.center.lat, cw.center.lon, 14)[0]?.it;
+    if (hit) {
+      // fill missing facility info from the crossing way
+      for (const k of ['crossing', 'crossing:signals', 'crossing:markings', 'crossing:island', 'crossing_ref', 'lit']) if (t[k] && !hit.tags[k]) { hit.tags[k] = t[k]; upgraded++; }
+    } else {
+      cand.push({ lat: cw.center.lat, lon: cw.center.lon, tags: { ...t }, node: null });
+      added++;
+    }
+  }
+
+  const crossings = [];
+  const facility = (c, road) => {
+    const t = c.tags;
+    if (t.crossing === 'traffic_signals' || t.highway === 'traffic_signals' || t['crossing:signals'] === 'yes' || ['pelican', 'toucan', 'puffin', 'pegasus'].includes(t.crossing_ref)) return T_SIGNALS;
+    // a vehicle signal ≤20 m on the same road controls the crossing too
+    for (const { it, d } of signalPts.near(c.lat, c.lon, 20)) {
+      const rs = nodeRoads.get(it.id);
+      if (!road || !rs || rs.some((x) => x.info.w.id === road.info.w.id) || d < 12) return T_SIGNALS;
+    }
+    if (['marked', 'zebra', 'uncontrolled'].includes(t.crossing) || t.crossing_ref === 'zebra' || (t['crossing:markings'] && t['crossing:markings'] !== 'no')) return T_ZEBRA;
+    return T_UNMARKED;
+  };
+
+  const pre = cand.map((c) => {
+    const road = c.node ? roadAtNode(c.node) : nearestRoad(c.lat, c.lon);
+    return { c, road, type: facility(c, road) };
+  });
+  // grade-separated crossings: tunnel footways / footbridges that pass a road of class ≤ tertiary
+  const grade = [];
+  const gradeSrc = [
+    ...tunnels.map((w) => ({ lat: w.geometry[Math.floor(w.geometry.length / 2)].lat, lon: w.geometry[Math.floor(w.geometry.length / 2)].lon, lit: w.tags?.lit })),
+    ...footbridges.map((w) => ({ lat: w.center.lat, lon: w.center.lon, lit: w.tags?.lit })),
+  ];
+  for (const g of gradeSrc) {
+    const road = nearestRoad(g.lat, g.lon, 30);
+    if (!road || CLASS_RANK[road.info.cls] < 3) continue;
+    if (grade.some((x) => hav(x.lat, x.lon, g.lat, g.lon) < 35)) continue;
+    grade.push({ ...g, road });
+  }
+  const safeIdx = pointIndex([
+    ...pre.filter((p) => p.type === T_SIGNALS).map((p) => ({ lat: p.c.lat, lon: p.c.lon })),
+    ...grade.map((g) => ({ lat: g.lat, lon: g.lon })),
+  ]);
+
+  const stat = { lanesDefault: 0, litUnknown: 0, school: 0, bus: 0, isolated: 0, island: 0 };
+  for (const { c, road, type } of pre) {
+    const t = c.tags;
+    const info = road?.info;
+    // no public road (trunk…residential) within 14 m → the crossing sits on a service road /
+    // parking aisle / driveway (not in the road extract): 2 lanes, 30 km/h, unverified
+    const lanes = info?.lanes ?? 2;
+    const lanesVerified = info?.lanesVerified ?? false;
+    const speed = info?.speed ?? 30;
+    let lit = t.lit === 'yes' || info?.lit === 'yes' ? 'yes' : t.lit === 'no' || info?.lit === 'no' ? 'no' : 'unknown';
+    let lampInferred = false;
+    if (lit === 'unknown' && lamps.near(c.lat, c.lon, 30).length) { lit = 'yes'; lampInferred = true; }
+    const island = t['crossing:island'] === 'yes';
+    const bus = type !== T_SIGNALS && busStops.near(c.lat, c.lon, 30).length > 0;
+    const school = type !== T_SIGNALS && schools.near(c.lat, c.lon, 150).length > 0;
+    const isolated = type !== T_SIGNALS && lanes >= 4 && !safeIdx.near(c.lat, c.lon, 250).length;
+    if (bus) stat.bus++;
+    if (school) stat.school++;
+    if (isolated) stat.isolated++;
+    if (!lanesVerified) stat.lanesDefault++;
+    if (lit === 'unknown') stat.litUnknown++;
+    if (island) stat.island++;
+    const { day, night } = crossingScore({ type, lanes, speed, lit, island, bus, school, isolated, lanesVerified });
+    const flags = (lit === 'yes' ? F_LIT_YES : 0) | (lit === 'no' ? F_LIT_NO : 0) | (bus ? F_BUS : 0) | (school ? F_SCHOOL : 0) | (isolated ? F_ISOLATED : 0) | (island ? F_ISLAND : 0) | (!lanesVerified ? F_LANES_EST : 0) | (!info ? F_SERVICE : 0) | (lampInferred ? F_LAMP : 0);
+    crossings.push([r5(c.lat), r5(c.lon), type, day, night, lanes, road?.bearing ?? -1, info?.name ?? -1, flags]);
+  }
+  for (const g of grade) {
+    const lit = g.lit === 'yes' ? 'yes' : g.lit === 'no' ? 'no' : 'unknown';
+    const { day, night } = crossingScore({ type: T_GRADE, lit });
+    crossings.push([r5(g.lat), r5(g.lon), T_GRADE, day, night, g.road.info.lanes, g.road.bearing, g.road.info.name, lit === 'yes' ? F_LIT_YES : lit === 'no' ? F_LIT_NO : 0]);
   }
 
   // metro stations
-  const sJson = JSON.parse(await fs.readFile(path.join(CACHE, 'stations.json'), 'utf8'));
   const stations = [];
   const seen = new Set();
   for (const el of sJson.elements) {
     const t = el.tags ?? {};
     if (!(t.station === 'subway' || t.subway === 'yes')) continue;
-    const name = t['name:az'] ?? t.name;
-    if (!name || seen.has(name)) continue;
+    // OSM `name` is the official Azerbaijani station name (name:az is sometimes a variant, e.g. 'Metro elmlər');
+    // exits ('çıxış') and depots ('deposu') carry station tags too and are skipped
+    const name = t.name ?? t['name:az'];
+    if (!name || seen.has(name) || /çıxış|deposu/i.test(name)) continue;
     seen.add(name);
     stations.push({ name, lat: r5(el.lat), lon: r5(el.lon) });
   }
 
   const counts = [0, 0, 0, 0];
   for (const c of crossings) counts[c[2]]++;
-  const out = { v: 1, generated: new Date().toISOString(), crossings, segments, stations };
+  const band = (i) => {
+    const b = [0, 0, 0];
+    for (const c of crossings) b[c[i] >= 75 ? 0 : c[i] >= 55 ? 1 : 2]++;
+    return `≥75 ${b[0]} · 55–74 ${b[1]} · <55 ${b[2]}`;
+  };
+  // metro tunnel geometry per consecutive station pair (on-device live routing draws real tunnels)
+  const metroHops = {};
+  const graph = await loadMetroGraph();
+  let hopsReal = 0;
+  if (graph) {
+    for (const line of [RED, GREEN]) {
+      for (let i = 1; i < line.length; i++) {
+        const a = findStation(stations, line[i - 1]), b = findStation(stations, line[i]);
+        if (!a || !b) continue;
+        const h = graph.hop(a, b);
+        if (!h) continue;
+        metroHops[`${line[i - 1]}|${line[i]}`] = simplify(h.pts.map(([lat, lon]) => ({ lat, lon })), 3).flatMap((p) => [r5(p.lat), r5(p.lon)]);
+        hopsReal++;
+      }
+    }
+  }
+  const out = { v: 2, generated: new Date().toISOString(), model: 'hara-irap-lite-1', crossings, segments, stations, names, metroHops };
   await fs.writeFile(OUT, JSON.stringify(out));
   const size = (await fs.stat(OUT)).size;
-  console.log(`crossings: ${crossings.length} (signals ${counts[0]}, zebra ${counts[1]}, unmarked ${counts[2]}, underground ${counts[3]})`);
-  console.log(`segments: ${segments.length}, stations: ${stations.length}`);
+  console.log(`crossings: ${crossings.length} (signals ${counts[0]}, zebra ${counts[1]}, unmarked ${counts[2]}, grade-separated ${counts[3]}); footway=crossing: +${added} new, ${upgraded} tags filled`);
+  console.log(`  day:   ${band(3)}\n  night: ${band(4)}`);
+  console.log(`  evidence: lanes defaulted ${stat.lanesDefault}, lit unknown ${stat.litUnknown}, bus stop ${stat.bus}, school ${stat.school}, isolated ${stat.isolated}, island ${stat.island}`);
+  console.log(`segments: ${segments.length}, stations: ${stations.length}, names: ${names.length}, metro hops with tunnel geometry: ${hopsReal}`);
   console.log(`wrote ${OUT} (${(size / 1024 / 1024).toFixed(2)} MB)`);
 }
 
