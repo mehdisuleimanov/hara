@@ -522,6 +522,8 @@ export function CityScreen() {
           Mənbə: OpenStreetMap töhfəçiləri (ODbL). Bal iRAP metodikasından ilhamlanan modeldir; piyada axını {ATTRACTOR_KIND.length} növ real OSM nöqtəsinə əsaslanan təxmindir.
         </Txt>
       </ScrollView>
+      {/* edge-to-edge: content scrolls under a soft status-bar veil */}
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: insets.top, backgroundColor: 'rgba(255,255,255,0.94)' }} />
     </View>
   );
 }

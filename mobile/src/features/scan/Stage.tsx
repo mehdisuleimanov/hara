@@ -92,14 +92,25 @@ function layoutBoxes(boxes: VisionBox[], w: number, h: number, iw: number, ih: n
     const bottom = Math.min(h - 2, oy + (y1 / 1000) * dh);
     const bw = right - left, bh = bottom - top;
     if (bw < 6 || bh < 6) return;
-    const pw = BOX_LABEL_AZ[b.label].length * 6.6 + 18;
-    const alignRight = left + pw + 8 > w;
-    const px0 = alignRight ? right - pw : left;
-    const tries = [top > 26 ? -24 : null, 3, bottom + 24 < h ? bh + 3 : null].filter((v): v is number => v != null);
-    const free = (dy: number) => !pills.some((q) => px0 < q.x1 + 4 && px0 + pw + 4 > q.x0 && top + dy < q.y1 + 2 && top + dy + 21 + 2 > q.y0);
-    const dy = tries.find(free) ?? tries[0];
-    pills.push({ x0: px0, x1: px0 + pw, y0: top + dy, y1: top + dy + 21 });
-    out.push({ b, i, left, top, bw, bh, labelDy: dy, alignRight });
+    const pw = BOX_LABEL_AZ[b.label].length * 7 + 18;
+    const natRight = left + pw + 8 > w;
+    const dys = [top > 26 ? -24 : null, 3, bottom + 24 < h ? bh + 3 : null].filter((v): v is number => v != null);
+    // candidates: each vertical slot, first with the natural alignment, then flipped
+    const cands: { dy: number; right: boolean }[] = [];
+    for (const dy of dys) {
+      cands.push({ dy, right: natRight });
+      if (natRight || right - pw >= 2) cands.push({ dy, right: !natRight });
+    }
+    const x0Of = (r: boolean) => (r ? right - pw : left);
+    const free = (c: { dy: number; right: boolean }) => {
+      const x0 = x0Of(c.right);
+      if (x0 < 0 || x0 + pw > w) return false;
+      return !pills.some((q) => x0 < q.x1 + 4 && x0 + pw + 4 > q.x0 && top + c.dy < q.y1 + 2 && top + c.dy + 23 > q.y0);
+    };
+    const pick = cands.find(free) ?? cands[0];
+    const px0 = x0Of(pick.right);
+    pills.push({ x0: px0, x1: px0 + pw, y0: top + pick.dy, y1: top + pick.dy + 21 });
+    out.push({ b, i, left, top, bw, bh, labelDy: pick.dy, alignRight: pick.right });
   });
   return out;
 }
