@@ -230,6 +230,14 @@ function ResultsView({
   );
   const firstFit = useRef(true);
   const userMoved = useRef(false);
+  // onMapReady is not reliable on the new architecture -> also fit on a timer after mount
+  useEffect(() => {
+    const a = setTimeout(() => !userMoved.current && fitRoute(snapRef.current), 350);
+    const b = setTimeout(() => !userMoved.current && fitRoute(snapRef.current), 1200);
+    const c = setTimeout(overlay.refresh, 1900);
+    return () => [a, b, c].forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (firstFit.current) {
       firstFit.current = false;

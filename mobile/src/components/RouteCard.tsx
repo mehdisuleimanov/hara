@@ -161,11 +161,9 @@ export const RouteCard = React.memo(function RouteCard({
     ? { label: lm, tone: 'danger', press: onLastMeters }
     : option.warning
       ? { label: option.warning, tone: option.kind === 'fastest' ? 'warn' : 'danger' }
-      : option.unsignalized === 0
-        ? { label: option.avoided > 0 ? `${option.avoided} riskli keçiddən yan keçir` : 'İşıqforsuz keçid yoxdur', tone: 'safe' }
-        : option.reasons.length
-          ? { label: option.reasons[option.reasons.length - 1], tone: 'safe' }
-          : null;
+      : option.unsignalized > 0
+        ? { label: `${option.unsignalized} işıqforsuz keçid`, tone: 'warn' }
+        : { label: option.avoided > 0 ? `${option.avoided} riskli keçiddən yan keçir` : 'İşıqforsuz keçid yoxdur', tone: 'safe' };
   // the select target is a full-card layer UNDER the content, so the last-meters chip can be
   // its own button (no nested buttons on web)
   return (
