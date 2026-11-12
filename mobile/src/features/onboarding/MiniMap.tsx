@@ -92,7 +92,7 @@ function Chip({ p, range, icon, label, color, bg }: { p: SharedValue<number>; ra
   return (
     <Animated.View style={[styles.chip, { backgroundColor: bg }, a]}>
       <Icon name={icon} size={13} color={color} />
-      <Txt w="bold" size={11.5} color={color}>
+      <Txt w="bold" size={11} color={color}>
         {label}
       </Txt>
     </Animated.View>
@@ -165,7 +165,7 @@ export function MiniMap({ active }: { active: boolean }) {
         </Svg>
       </View>
       <View style={styles.legend}>
-        <Chip p={p} range={[0.1, 0.18, 0.4, 0.48]} icon="alert" label="İşıqforsuz · 6 zolaq" color={C.danger} bg={C.dangerSoft} />
+        <Chip p={p} range={[0.1, 0.18, 0.4, 0.48]} icon="alert" label="İşıqforsuz keçid" color={C.danger} bg={C.dangerSoft} />
         <Chip p={p} range={[0.6, 0.68, 0.94, 1]} icon="traffic-light" label="İşıqforlu keçid" color={C.brandDark} bg={C.brandSoft} />
       </View>
     </View>
@@ -174,12 +174,12 @@ export function MiniMap({ active }: { active: boolean }) {
 
 const styles = StyleSheet.create({
   wrap: { borderRadius: R.lg, overflow: 'hidden', backgroundColor: '#F4F7FB' },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingBottom: 12, paddingTop: 2 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, paddingHorizontal: 8, paddingBottom: 12, paddingTop: 2 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     height: 28,
     borderRadius: R.pill,
   },
