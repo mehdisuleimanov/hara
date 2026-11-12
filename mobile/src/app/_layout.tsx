@@ -15,6 +15,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { Unbounded_700Bold, Unbounded_800ExtraBold } from '@expo-google-fonts/unbounded';
 import { ToastHost } from '@/components/Toast';
+import { AnimatedSplash, SPLASH_BG } from '@/components/splash/AnimatedSplash';
 import { DemoPanel } from '@/components/DemoPanel';
 import { A11yMorphHost } from '@/features/a11y/MorphHost';
 import { setupNotifications } from '@/utils/notify';
@@ -113,6 +114,8 @@ export default function RootLayout() {
     Unbounded_800ExtraBold,
   });
   const hydrated = usePrefs((p) => p.hydrated);
+  // logo intro plays once per cold start, over the app (which mounts underneath)
+  const [intro, setIntro] = useState(true);
 
   useEffect(() => {
     usePrefs.getState().hydrate();
@@ -124,7 +127,8 @@ export default function RootLayout() {
     if (ready && Platform.OS !== 'web') SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+  // same navy as the native splash and the intro's first frame, so there is no flash
+  if (!ready) return <View style={{ flex: 1, backgroundColor: SPLASH_BG }} />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -144,6 +148,7 @@ export default function RootLayout() {
           <A11yMorphHost />
           <ToastHost />
           <DemoPanel />
+          {intro ? <AnimatedSplash onDone={() => setIntro(false)} /> : null}
         </View>
       </PhoneFrame>
     </GestureHandlerRootView>

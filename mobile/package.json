@@ -51,6 +51,8 @@
     "data:osm": "node scripts/fetch-osm.mjs",
     "data:layer": "node scripts/build-safety-layer.mjs",
     "data:routes": "node scripts/build-routes.mjs",
+    "motion:layers": "node scripts/build-logo-layers.mjs",
+    "motion:render": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/render-logo-motion.mjs",
     "smoke:gemini": "node --env-file=.env scripts/smoke-gemini.mjs"
   },
   "private": true
