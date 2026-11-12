@@ -56,7 +56,7 @@ export function matchIntent(text: string): Intent {
   if (has('usaq araba', 'kolyaska', 'araba ile')) companions.push('stroller');
   if (has('elil', 'invalid', 'teker')) companions.push('wheelchair');
   if (has('nene', 'baba', 'yasli')) companions.push('elderly');
-  if (has('usaq', 'oglum', 'qizim')) companions.push('child');
+  if (has('oglum', 'qizim') || (has('usaq') && t.replace(/usaq araba\w*/g, '').includes('usaq'))) companions.push('child');
 
   let profile: Profile = 'daily';
   if (companions.includes('stroller') || companions.includes('wheelchair')) profile = 'accessible';

@@ -349,9 +349,10 @@ export default function AhmedScreen() {
     orbBox.value = withSpring(compact ? 0 : 1, SPRING.gentle);
   }, [compact, orbBox]);
   const smallOrb = 112;
-  const orbWrap = useAnimatedStyle(() => {
+  const orbWrap = useAnimatedStyle(() => ({ height: smallOrb + (orbSize - smallOrb) * orbBox.value + 8 }));
+  const orbInner = useAnimatedStyle(() => {
     const h = smallOrb + (orbSize - smallOrb) * orbBox.value;
-    return { height: h + 8, transform: [{ scale: h / orbSize }] };
+    return { transform: [{ translateY: h / 2 - orbSize / 2 }, { scale: h / orbSize }] };
   });
 
   const status =
@@ -437,12 +438,12 @@ export default function AhmedScreen() {
         >
           {/* orb + Əhməd */}
           <Animated.View style={[{ width: orbSize, alignItems: 'center', justifyContent: 'flex-start', marginTop: 6 }, orbWrap]}>
-            <View style={{ width: orbSize, height: orbSize }}>
+            <Animated.View style={[{ width: orbSize, height: orbSize }, orbInner]}>
               <Orb size={orbSize} level={orbLevel} state={orbState} />
               <StageTrigger onFire={runDemo} style={[styles.badge, { right: orbSize * 0.04, bottom: orbSize * 0.04 }]}>
                 <TalkingAvatar size={38} level={voice.level} speaking={voice.speaking} />
               </StageTrigger>
-            </View>
+            </Animated.View>
           </Animated.View>
 
           {phase === 'idle' ? (
