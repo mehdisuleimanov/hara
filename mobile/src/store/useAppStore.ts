@@ -4,6 +4,16 @@ import { SEED_REPORTS } from '@/data/reports-seed';
 
 export type TimeMode = 'auto' | TimeOfDay;
 
+export type AhmedStep = {
+  /** tool name or pipeline stage id */
+  id: string;
+  /** short Azerbaijani label shown in the thinking trace */
+  label: string;
+  /** result summary shown after completion */
+  value?: string;
+  state: 'run' | 'done' | 'warn' | 'fail';
+};
+
 export type AhmedResult = {
   transcript: string;
   destId: string | null;
@@ -13,6 +23,14 @@ export type AhmedResult = {
   companions: string[];
   reply: string;
   source: 'ai' | 'fallback';
+  /** route | free question | not understood */
+  intent?: 'route' | 'question' | 'unclear';
+  /** GeminiErrorCode when AI failed (never shown to users) */
+  error?: string;
+  /** real agent steps (thinking trace) */
+  steps?: AhmedStep[];
+  /** live route to a place outside the catalog (features/routing/live) */
+  liveRouteId?: string;
 };
 
 type Toast = { id: number; text: string; icon?: string };

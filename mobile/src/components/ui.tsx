@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  LayoutChangeEvent,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -9,9 +10,26 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { C, F, R, shadow } from '@/theme';
+import { C, C_HC, F, R, T, shadow, type TypeVariant } from '@/theme';
+import { useTheme } from '@/hooks/useTheme';
+import { PressableScale } from '@/motion/PressableScale';
+import { SPRING } from '@/motion/springs';
+
+/** In high-contrast mode, soft text colors are remapped to their strong versions. */
+const HC_MAP: Record<string, string> = {
+  [C.ink]: C_HC.ink,
+  [C.ink2]: C_HC.ink2,
+  [C.muted]: C_HC.muted,
+  [C.faint]: C_HC.faint,
+  [C.brand]: C_HC.brand,
+  [C.route]: C_HC.route,
+  [C.safe]: C_HC.safe,
+  [C.warn]: C_HC.warn,
+  [C.danger]: C_HC.danger,
+};
 
 export type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -29,11 +47,13 @@ export function Icon({
   style?: StyleProp<TextStyle>;
   label?: string;
 }) {
+  const t = useTheme();
+  const col = t.hc ? HC_MAP[color] ?? color : color;
   return (
     <MaterialCommunityIcons
       name={name as IconName}
-      size={size}
-      color={color}
+      size={Math.round(size * Math.min(t.s, 1.3))}
+      color={col}
       style={style}
       {...(label ? { accessibilityLabel: label } : { 'aria-hidden': true })}
     />
@@ -41,30 +61,51 @@ export function Icon({
 }
 
 type TxtProps = TextProps & {
+  /** type-scale variant (theme T); explicit w/size/lh/ls override it */
+  v?: TypeVariant;
   w?: keyof typeof F;
   size?: number;
   color?: string;
   lh?: number;
   ls?: number;
   center?: boolean;
+  /** uppercase (overline) */
+  caps?: boolean;
 };
 
-export function Txt({ w = 'med', size = 15, color = C.ink, lh, ls, center, style, ...rest }: TxtProps) {
+/**
+ * All app text. Scales with the accessibility mode (senior / low-vision) and remaps
+ * colors in high contrast — so one tap restyles every screen.
+ */
+export function Txt({ v, w, size, color = C.ink, lh, ls, center, caps, style, children, ...rest }: TxtProps) {
+  const t = useTheme();
+  const base = v ? T[v] : undefined;
+  const fam = w ?? (base?.f as keyof typeof F | undefined) ?? 'med';
+  const sz0 = size ?? base?.size ?? 15;
+  const sz = t.font(sz0);
+  const lh0 = lh ?? (size == null ? base?.lh : undefined);
+  const lineHeight = lh0 != null ? lh0 * (sz / sz0) : undefined;
+  const letterSpacing = ls ?? (size == null && base ? base.ls : sz0 >= 26 ? -1 : sz0 >= 18 ? -0.4 : 0);
+  const col = t.hc ? HC_MAP[color] ?? (color.startsWith('rgba(255,255,255') ? '#FFFFFF' : color) : color;
   return (
     <Text
+      maxFontSizeMultiplier={1.4}
       {...rest}
       style={[
         {
-          fontFamily: F[w],
-          fontSize: size,
-          color,
-          lineHeight: lh,
-          letterSpacing: ls ?? (size >= 26 ? -1 : size >= 18 ? -0.4 : 0),
+          fontFamily: F[fam],
+          fontSize: sz,
+          color: col,
+          lineHeight,
+          letterSpacing,
           textAlign: center ? 'center' : undefined,
+          textTransform: caps || v === 'overline' ? 'uppercase' : undefined,
         },
         style,
       ]}
-    />
+    >
+      {children}
+    </Text>
   );
 }
 
@@ -139,33 +180,33 @@ export function CircleButton({
   children?: React.ReactNode;
   label?: string;
 }) {
-  const slop = size < 48 ? Math.ceil((48 - size) / 2) : 0; // 48dp minimum target
+  const t = useTheme();
+  const sz = Math.round(size * Math.min(t.s, 1.2));
+  const slop = sz < t.hit ? Math.ceil((t.hit - sz) / 2) : 0; // minimum target grows with a11y mode
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label ?? (icon ? ICON_LABEL[icon] : undefined)}
       hitSlop={slop}
-      onPress={() => {
-        tap();
-        onPress?.();
-      }}
+      scaleTo={0.9}
+      onPress={onPress}
       onLongPress={onLongPress}
-      delayLongPress={600}
-      style={({ pressed }) => [
+      delayLongPress={1200}
+      style={[
         {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
+          width: sz,
+          height: sz,
+          borderRadius: sz / 2,
           backgroundColor: bg,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: pressed ? 0.75 : 1,
         },
+        t.hc && bg !== 'transparent' ? { borderWidth: 2, borderColor: C_HC.line } : null,
         style,
       ]}
     >
       {children ?? (icon ? <Icon name={icon} size={iconSize ?? size * 0.42} color={color} /> : null)}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -198,18 +239,18 @@ export function PillButton({
   disabled?: boolean;
 }) {
   const v = VARIANT[variant];
+  const t = useTheme();
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
-      onPress={() => {
-        tap(Haptics.ImpactFeedbackStyle.Medium);
-        onPress?.();
-      }}
-      style={({ pressed }) => [
+      haptic="medium"
+      scaleTo={0.97}
+      onPress={onPress}
+      style={[
         {
-          height,
+          height: Math.round(height * Math.min(t.s, 1.25)),
           borderRadius: R.pill,
           backgroundColor: v.bg,
           flexDirection: 'row',
@@ -217,9 +258,9 @@ export function PillButton({
           justifyContent: 'center',
           gap: 10,
           paddingHorizontal: 22,
-          borderWidth: variant === 'outline' ? 1.5 : 0,
-          borderColor: C.line,
-          opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
+          borderWidth: variant === 'outline' || t.hc ? (t.hc ? 2 : 1.5) : 0,
+          borderColor: t.hc ? C_HC.line : C.line,
+          opacity: disabled ? 0.45 : 1,
         },
         style,
       ]}
@@ -228,7 +269,7 @@ export function PillButton({
       <Txt w="bold" size={16.5} color={v.fg}>
         {label}
       </Txt>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -346,13 +387,10 @@ export function Chip({
 }) {
   if (active || !icon) {
     return (
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ selected: !!active }}
-        onPress={() => {
-          tap();
-          onPress?.();
-        }}
+        onPress={onPress}
         style={[styles.chipActive, dark && { backgroundColor: C.black }, !icon && { paddingLeft: 18 }]}
       >
         {icon ? (
@@ -365,22 +403,20 @@ export function Chip({
             {label}
           </Txt>
         ) : null}
-      </Pressable>
+      </PressableScale>
     );
   }
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: false }}
-      onPress={() => {
-        tap();
-        onPress?.();
-      }}
+      scaleTo={0.9}
+      onPress={onPress}
       style={styles.chipCircle}
     >
       <Icon name={icon} size={24} color={C.ink} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -408,11 +444,86 @@ export function Tag({
 }
 
 export function Card({ style, children }: { style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const t = useTheme();
+  return <View style={[styles.card, t.hc && styles.hcBorder, style]}>{children}</View>;
 }
 
-export function DemoBadge({ style }: { style?: StyleProp<ViewStyle> }) {
-  return <Tag label="Demo data" bg="rgba(15,27,45,0.05)" color={C.muted} style={style} />;
+/** Plain surface block (cards, sheets); gains a strong border in high contrast. */
+export function Surface({
+  style,
+  children,
+  elevated,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children?: React.ReactNode;
+  elevated?: boolean;
+}) {
+  const t = useTheme();
+  return (
+    <View style={[{ backgroundColor: C.surface, borderRadius: R.lg, padding: 16 }, elevated && shadow(2), t.hc && styles.hcBorder, style]}>
+      {children}
+    </View>
+  );
+}
+
+/** Segmented control with a sliding pill indicator. */
+export function Segmented<K extends string>({
+  options,
+  value,
+  onChange,
+  dark,
+  style,
+}: {
+  options: { key: K; label: string; icon?: string }[];
+  value: K;
+  onChange: (k: K) => void;
+  dark?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const [w, setW] = useState(0);
+  const idx = Math.max(0, options.findIndex((o) => o.key === value));
+  const x = useSharedValue(0);
+  const seg = w > 0 ? (w - 8) / options.length : 0;
+  useEffect(() => {
+    x.value = withSpring(idx * seg, SPRING.snappy);
+  }, [idx, seg, x]);
+  const ind = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  return (
+    <View
+      onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+      style={[{ flexDirection: 'row', backgroundColor: dark ? C.navy2 : C.bg2, borderRadius: R.pill, padding: 4, height: 48 }, style]}
+    >
+      {seg > 0 ? (
+        <Animated.View
+          style={[
+            { position: 'absolute', left: 4, top: 4, bottom: 4, width: seg, borderRadius: R.pill, backgroundColor: dark ? '#FFFFFF' : C.navy },
+            ind,
+          ]}
+        />
+      ) : null}
+      {options.map((o) => {
+        const on = o.key === value;
+        const fg = on ? (dark ? C.navy : '#FFFFFF') : dark ? '#FFFFFF' : C.ink;
+        return (
+          <Pressable
+            key={o.key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            onPress={() => {
+              tap();
+              onChange(o.key);
+            }}
+            style={{ flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {o.icon ? <Icon name={o.icon} size={18} color={fg} /> : null}
+            <Txt w="semi" size={14} color={fg}>
+              {o.label}
+            </Txt>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -457,6 +568,7 @@ const styles = StyleSheet.create({
     padding: 20,
     ...shadow(1),
   },
+  hcBorder: { borderWidth: 2, borderColor: C_HC.line },
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -8,7 +8,7 @@ import { ROUTES } from '@/data/routes';
 import { destById } from '@/data/destinations';
 import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
 import { DestPin, OriginPin } from '@/components/RouteLines';
-import { CircleButton, DemoBadge, Icon, PillButton, Tag, Txt, Heading } from '@/components/ui';
+import { CircleButton, Icon, PillButton, Tag, Txt, Heading } from '@/components/ui';
 import { regionFor, toLatLngs } from '@/utils/geo';
 import { C, R } from '@/theme';
 
@@ -37,7 +37,6 @@ export default function Accessible() {
           <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
           <Tag label="Əlçatan rejim" icon="wheelchair-accessibility" bg={C.brand} color={C.navy} style={{ height: 40, paddingHorizontal: 16 }} />
           <View style={{ flex: 1 }} />
-          <DemoBadge />
         </View>
         <Heading light="Pilləkənsiz" bold="marşrut" size={34} newline style={{ marginTop: 18 }} />
         <Txt w="semi" size={15} color={C.muted} style={{ marginTop: 6 }}>
@@ -141,7 +140,7 @@ export default function Accessible() {
               Nizami m. · 1-ci çıxış · 18:40{'\n'}Əməkdaş sizi lift qarşısında gözləyəcək
             </Txt>
             <Txt w="med" size={12.5} color={C.muted} center style={{ marginTop: 10 }}>
-              Demo: Bakı Metropoliteni ilə inteqrasiya pilot mərhələsidir
+              Bakı Metropoliteninin «Əlçatan metro» xidməti ilə
             </Txt>
             <PillButton label="Oldu" variant="black" style={{ marginTop: 18, alignSelf: 'stretch' }} onPress={() => setBooked(false)} />
           </View>

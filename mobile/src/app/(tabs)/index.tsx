@@ -26,7 +26,6 @@ export default function Home() {
   const night = useIsNight();
   const profile = useAppStore((s) => s.profile);
   const setProfile = useAppStore((s) => s.setProfile);
-  const setDemo = useAppStore((s) => s.setDemoPanelOpen);
   const hero = destById('hilton')!;
   const opt = optionOf('hilton', 'safest');
   const heroScore = opt ? (night ? opt.scoreNight : opt.scoreDay) : 92;
@@ -39,7 +38,7 @@ export default function Home() {
     >
       {/* top bar: gray menu circle · pill with "··" + avatar */}
       <View style={styles.row}>
-        <CircleButton icon="menu" size={56} bg={C.bg2} onLongPress={() => setDemo(true)} onPress={() => router.navigate('/profile')} />
+        <CircleButton icon="menu" size={56} bg={C.bg2} onPress={() => router.navigate('/profile')} />
         <HaraWordmark width={96} />
         <View style={styles.topRight}>
           <CircleButton icon="dots-horizontal" size={52} bg={C.bg2} label="Daha çox" onPress={() => router.navigate('/map')} />
@@ -52,7 +51,7 @@ export default function Home() {
       <View style={[styles.row, { marginTop: 22, alignItems: 'center' }]}>
         <View style={{ flex: 1, paddingRight: 12 }}>
           <Txt w="semi" size={15} color={C.ink2}>
-            Salam, Aysel 👋
+            Salam, Aysel
           </Txt>
           <Heading light="Bakıda Təhlükəsiz" bold="Yol Tap" size={34} newline style={{ marginTop: 8 }} />
         </View>

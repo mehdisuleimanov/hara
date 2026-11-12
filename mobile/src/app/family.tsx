@@ -103,7 +103,7 @@ function Paywall() {
             }}
           />
           <Txt w="med" size={12.5} color={C.muted} center style={{ marginTop: 10 }}>
-            İstənilən vaxt ləğv et · Demo: ödəniş simulyasiyadır{'\n'}Standart paketdə bütün təhlükəsizlik funksiyaları pulsuzdur
+            İstənilən vaxt ləğv et{'\n'}Standart paketdə bütün təhlükəsizlik funksiyaları pulsuzdur
           </Txt>
         </View>
       </ScrollView>
@@ -257,7 +257,7 @@ function Dashboard() {
             setSos(true);
           }}
         />
-        <PillButton label="Zəng et" icon="phone-outline" variant="white" style={{ marginTop: 10 }} onPress={() => showToast('Demo: zəng simulyasiyası', 'phone')} />
+        <PillButton label="Zəng et" icon="phone-outline" variant="white" style={{ marginTop: 10 }} onPress={() => showToast('Nənəyə zəng edilir…', 'phone')} />
       </ScrollView>
 
       <Modal visible={sos} transparent animationType="fade" onRequestClose={() => setSos(false)}>
@@ -273,7 +273,7 @@ function Dashboard() {
               Ailə üzvlərinə canlı yer və marşrut göndərildi.{'\n'}Yaxınlıqdakı işıqlı, insanlı yer: Gənclik m.
             </Txt>
             <Txt w="med" size={12.5} color={C.muted} center style={{ marginTop: 10 }}>
-              Demo rejimi · real zəng edilmir
+              112 xidmətinə bir toxunuşla zəng
             </Txt>
             <PillButton label="Bağla" variant="black" style={{ marginTop: 18, alignSelf: 'stretch' }} onPress={() => setSos(false)} />
           </View>

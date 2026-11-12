@@ -143,7 +143,7 @@ export default function WidgetPreview() {
         <View style={{ flex: 1 }} />
         <Txt w="med" size={12} color={C.muted} center style={{ marginBottom: insets.bottom + 16 }}>
           {snap.active ? 'Canlı · naviqasiya davam edir' : 'Nümunə · naviqasiyanı başladanda canlı olur'}
-          {'\n'}Kilid ekranı simulyasiyası · bağlamaq üçün toxun
+          {'\n'}Bağlamaq üçün toxun
         </Txt>
       </View>
     </Pressable>

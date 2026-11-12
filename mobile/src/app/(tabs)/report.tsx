@@ -10,6 +10,7 @@ import { REPORT_META } from '@/data/reports-seed';
 import type { ReportCategory } from '@/data/types';
 import { ROUTES } from '@/data/routes';
 import { geminiJson } from '@/ai/gemini';
+import { log } from '@/utils/log';
 import { AhmedAvatar } from '@/components/Brand';
 import { Orb } from '@/components/Orb';
 import { Burst, FadeIn, Pop } from '@/components/anim';
@@ -99,7 +100,7 @@ export default function Report() {
         if (r.transcript) transcript = r.transcript;
       }
     } catch (e) {
-      console.warn('[Bildir] voice fallback', String(e));
+      log('[Bildir] voice fallback', String(e));
     }
     submit(category, transcript);
   };

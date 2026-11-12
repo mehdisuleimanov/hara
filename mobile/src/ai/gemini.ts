@@ -1,74 +1,217 @@
 /**
- * Minimal Gemini REST client (generateContent). The key is bundled into the app
- * via EXPO_PUBLIC_ env vars — acceptable for the hackathon demo only.
- * Put a spend cap on the key and rotate it after the demo.
+ * Gemini REST client (generateContent) — JSON answers, tool/function calling and TTS.
+ * The key is bundled via EXPO_PUBLIC_ env vars: put a spend cap on it and rotate after the event.
  *
- * Measured on 2026-11-12: gemini-3.8-flash hung (>40 s), 3.5-flash took ~10 s,
- * 3.5-flash-lite answered in 1.7–9 s but intermittently returned 403/503,
- * 3.1-flash-lite answered in 0.8–1.7 s (text and Azerbaijani audio, 3/3 correct).
- * So we try a short chain of lite models inside one overall deadline, and the
- * caller falls back to the offline script if everything fails.
+ * Latency notes (2026-11-12): 3.1-flash-lite answered text + Azerbaijani audio in 0.8–1.7 s;
+ * 3.5-flash-lite 1.7–9 s with occasional 403/503. We try a short chain inside one deadline.
  */
+import { log } from '@/utils/log';
 
 export const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 export const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.1-flash-lite';
-const FALLBACK_MODELS = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite'];
+export const GEMINI_TTS_MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
+const FALLBACK_MODELS = ['gemini-3.5-flash-lite'];
+const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+export type GeminiErrorCode = 'NO_KEY' | 'OFFLINE' | 'TIMEOUT' | 'HTTP_4XX' | 'HTTP_5XX' | 'PARSE' | 'EMPTY';
+export class GeminiError extends Error {
+  code: GeminiErrorCode;
+  status?: number;
+  constructor(code: GeminiErrorCode, message: string = code, status?: number) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
 
-async function once<T>(model: string, body: string, timeoutMs: number): Promise<T> {
+export type Part =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
+  | { functionCall: { name: string; args?: Record<string, unknown>; id?: string } }
+  | { functionResponse: { name: string; response: Record<string, unknown>; id?: string } };
+
+export type Content = { role: 'user' | 'model'; parts: Part[] };
+
+export type FunctionDecl = {
+  name: string;
+  description: string;
+  parameters?: object;
+};
+
+let thinkingSupported = true;
+
+async function post(model: string, body: object, timeoutMs: number): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
-      body,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}/${model}:generateContent`, {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      throw new GeminiError(ctrl.signal.aborted ? 'TIMEOUT' : 'OFFLINE', String(e));
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`HTTP_${res.status}: ${text.slice(0, 160)}`);
+      throw new GeminiError(res.status >= 500 ? 'HTTP_5XX' : 'HTTP_4XX', `HTTP_${res.status}: ${text.slice(0, 300)}`, res.status);
     }
-    const json = await res.json();
-    const text: string =
-      json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
-    return JSON.parse(text) as T;
+    return await res.json();
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function geminiJson<T>(opts: {
-  system: string;
-  parts: Part[];
-  schema: object;
-  timeoutMs?: number;
-}): Promise<T> {
-  if (!GEMINI_KEY) throw new Error('NO_KEY');
-  const deadline = Date.now() + (opts.timeoutMs ?? 9000);
-  const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: opts.system }] },
-    contents: [{ role: 'user', parts: opts.parts }],
-    generationConfig: {
-      temperature: 0.3,
-      responseMimeType: 'application/json',
-      responseSchema: opts.schema,
-    },
-  });
+function withThinking(gen: Record<string, unknown>) {
+  return thinkingSupported ? { ...gen, thinkingConfig: { thinkingLevel: 'minimal' } } : gen;
+}
+
+/** Calls the model chain within one deadline. Retries once without thinkingConfig if rejected. */
+async function generate(body: (gen: (g: Record<string, unknown>) => Record<string, unknown>) => object, timeoutMs: number, firstCapMs: number) {
+  if (!GEMINI_KEY) throw new GeminiError('NO_KEY');
+  const deadline = Date.now() + timeoutMs;
   const models = [GEMINI_MODEL, ...FALLBACK_MODELS.filter((m) => m !== GEMINI_MODEL)];
   let lastErr: unknown;
   for (let i = 0; i < models.length; i++) {
-    const model = models[i];
     const left = deadline - Date.now();
     if (left < 1200) break;
     try {
-      // cap the primary attempt so a hanging model still leaves time for a fallback
-      return await once<T>(model, body, i === 0 ? Math.min(left, 5000) : left);
+      return await post(models[i], body(withThinking), i === 0 ? Math.min(left, firstCapMs) : left);
     } catch (e) {
+      if (e instanceof GeminiError && e.code === 'HTTP_4XX' && /thinking/i.test(e.message) && thinkingSupported) {
+        thinkingSupported = false;
+        i--; // retry same model without thinking
+        continue;
+      }
       lastErr = e;
-      console.warn(`[gemini] ${model} failed: ${String(e).slice(0, 120)}`);
+      log(`[gemini] ${models[i]} failed: ${String(e).slice(0, 140)}`);
+      if (e instanceof GeminiError && (e.code === 'NO_KEY' || e.code === 'OFFLINE')) break;
     }
   }
-  throw lastErr ?? new Error('GEMINI_DEADLINE');
+  if (lastErr instanceof GeminiError) throw lastErr;
+  throw new GeminiError('TIMEOUT', String(lastErr ?? 'deadline'));
 }
+
+function textOf(json: any): string {
+  return json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+}
+
+/** Structured JSON answer (responseSchema). */
+export async function geminiJson<T>(opts: { system: string; parts: Part[]; schema: object; timeoutMs?: number; temperature?: number }): Promise<T> {
+  const isAudio = opts.parts.some((p) => 'inlineData' in p && p.inlineData.mimeType.startsWith('audio'));
+  const json = await generate(
+    (gen) => ({
+      systemInstruction: { parts: [{ text: opts.system }] },
+      contents: [{ role: 'user', parts: opts.parts }],
+      generationConfig: gen({ temperature: opts.temperature ?? 0.3, responseMimeType: 'application/json', responseSchema: opts.schema }),
+    }),
+    opts.timeoutMs ?? 12000,
+    isAudio ? 8000 : 6000,
+  );
+  const text = textOf(json);
+  if (!text) throw new GeminiError('EMPTY');
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new GeminiError('PARSE', text.slice(0, 200));
+  }
+}
+
+/** One raw turn with tools available. Returns the model content (text and/or functionCall parts). */
+export async function geminiTurn(opts: {
+  system: string;
+  contents: Content[];
+  tools?: FunctionDecl[];
+  timeoutMs?: number;
+  temperature?: number;
+}): Promise<Content> {
+  const json = await generate(
+    (gen) => ({
+      systemInstruction: { parts: [{ text: opts.system }] },
+      contents: opts.contents,
+      ...(opts.tools?.length ? { tools: [{ functionDeclarations: opts.tools }], toolConfig: { functionCallingConfig: { mode: 'AUTO' } } } : {}),
+      generationConfig: gen({ temperature: opts.temperature ?? 0.2 }),
+    }),
+    opts.timeoutMs ?? 10000,
+    7000,
+  );
+  const content = json?.candidates?.[0]?.content as Content | undefined;
+  if (!content?.parts?.length) throw new GeminiError('EMPTY');
+  return { role: 'model', parts: content.parts };
+}
+
+export type ToolImpl = (args: Record<string, any>) => Promise<Record<string, unknown>> | Record<string, unknown>;
+
+/**
+ * Agent loop: the model calls tools (executed on-device), sees their results and answers.
+ * `onStep` fires for every real tool call (drives the visible "thinking" trace).
+ */
+export async function runToolLoop(opts: {
+  system: string;
+  userParts: Part[];
+  tools: { decl: FunctionDecl; impl: ToolImpl }[];
+  onStep?: (s: { name: string; args: Record<string, unknown>; result?: Record<string, unknown>; phase: 'call' | 'done' | 'error' }) => void;
+  maxTurns?: number;
+  timeoutMs?: number;
+}): Promise<{ text: string; contents: Content[] }> {
+  const deadline = Date.now() + (opts.timeoutMs ?? 16000);
+  const contents: Content[] = [{ role: 'user', parts: opts.userParts }];
+  const byName = new Map(opts.tools.map((t) => [t.decl.name, t.impl]));
+  for (let turn = 0; turn < (opts.maxTurns ?? 4); turn++) {
+    const left = deadline - Date.now();
+    if (left < 1500) throw new GeminiError('TIMEOUT');
+    const reply = await geminiTurn({ system: opts.system, contents, tools: opts.tools.map((t) => t.decl), timeoutMs: left });
+    contents.push(reply);
+    const calls = reply.parts.filter((p): p is Extract<Part, { functionCall: unknown }> => 'functionCall' in p);
+    if (!calls.length) {
+      return { text: reply.parts.map((p) => ('text' in p ? p.text : '')).join(''), contents };
+    }
+    const responses: Part[] = [];
+    for (const c of calls) {
+      const { name, args = {}, id } = c.functionCall;
+      opts.onStep?.({ name, args, phase: 'call' });
+      let result: Record<string, unknown>;
+      try {
+        const impl = byName.get(name);
+        result = impl ? await impl(args) : { error: `unknown tool ${name}` };
+        opts.onStep?.({ name, args, result, phase: 'done' });
+      } catch (e) {
+        result = { error: String(e) };
+        opts.onStep?.({ name, args, result, phase: 'error' });
+      }
+      responses.push({ functionResponse: { name, response: result, ...(id ? { id } : {}) } });
+    }
+    contents.push({ role: 'user', parts: responses });
+  }
+  throw new GeminiError('TIMEOUT', 'too many tool turns');
+}
+
+/**
+ * Text-to-speech (Azerbaijani supported). Returns base64 PCM16 mono + sample rate.
+ * `style` is prepended as a natural-language instruction.
+ */
+export async function geminiTts(text: string, opts: { voice?: string; style?: string; timeoutMs?: number } = {}): Promise<{ pcmB64: string; rate: number }> {
+  if (!GEMINI_KEY) throw new GeminiError('NO_KEY');
+  const prompt = `${opts.style ?? 'Say in a warm, calm, friendly voice, in Azerbaijani:'} ${text}`;
+  const json = await post(
+    GEMINI_TTS_MODEL,
+    {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: opts.voice ?? DEFAULT_VOICE } } },
+      },
+    },
+    opts.timeoutMs ?? 8000,
+  );
+  const part = json?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
+  if (!part) throw new GeminiError('EMPTY');
+  const mime: string = part.inlineData.mimeType ?? '';
+  const rate = Number(/rate=(\d+)/.exec(mime)?.[1] ?? 24000);
+  return { pcmB64: part.inlineData.data, rate };
+}
+
+export const DEFAULT_VOICE = process.env.EXPO_PUBLIC_GEMINI_VOICE || 'Charon';

@@ -10,7 +10,7 @@ import { ROUTES } from '@/data/routes';
 import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
 import { DestPin, OriginPin } from '@/components/RouteLines';
 import { AhmedAvatar } from '@/components/Brand';
-import { CircleButton, DemoBadge, Heading, Icon, PillButton, Tag, Txt } from '@/components/ui';
+import { CircleButton, Heading, Icon, PillButton, Tag, Txt } from '@/components/ui';
 import { regionFor, toLatLngs } from '@/utils/geo';
 import { speak, stopSpeaking } from '@/utils/tts';
 import { C, R } from '@/theme';
@@ -67,7 +67,6 @@ export default function Scooter() {
           <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
           <Icon name="scooter" size={30} />
           <Heading light="Skuter" bold="rejimi" size={28} style={{ flex: 1 }} />
-          <DemoBadge />
         </View>
 
         {/* wind card */}
@@ -88,7 +87,7 @@ export default function Scooter() {
         <View style={styles.sliderCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Txt w="semi" size={13} color={C.muted}>
-              KÜLƏYİ DƏYİŞ (demo)
+              KÜLƏK İNDİ
             </Txt>
             <Txt w="bold" size={13} color={banned ? C.danger : useCalm ? C.ink : C.safe}>
               {banned ? 'Skuter gizlədildi' : useCalm ? 'Daxili küçələr' : 'Dənizkənarı'}

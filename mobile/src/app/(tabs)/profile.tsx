@@ -47,7 +47,6 @@ export default function Profile() {
   const reportsMade = useAppStore((s) => s.reportsMade);
   const helped = useAppStore((s) => s.helped);
   const familySubscribed = useAppStore((s) => s.familySubscribed);
-  const setDemo = useAppStore((s) => s.setDemoPanelOpen);
   const levelMax = 2000;
   const shownPts = useCountUp(points, 1100);
   const prog = useRef(new Animated.Value(0)).current;
@@ -74,7 +73,7 @@ export default function Profile() {
               </Txt>
             </View>
           </View>
-          <CircleButton icon="cog-outline" size={52} onLongPress={() => setDemo(true)} />
+          <CircleButton icon="cog-outline" size={52} />
         </View>
       </FadeIn>
 
