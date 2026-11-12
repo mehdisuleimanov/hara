@@ -1,0 +1,71 @@
+name: Android APK
+
+# Builds an installable release APK without an Expo account:
+# expo prebuild -> Gradle assembleRelease (signed with the template debug keystore).
+# Secrets: GEMINI_API_KEY (Əhməd), GOOGLE_MAPS_API_KEY (map in standalone Android builds).
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Check secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          [ -n "$GEMINI_API_KEY" ] || echo "::warning::GEMINI_API_KEY is not set — Əhməd will use the offline script"
+          [ -n "$GOOGLE_MAPS_API_KEY" ] || echo "::warning::GOOGLE_MAPS_API_KEY is not set — the map will be blank in this APK"
+
+      - run: npm ci
+
+      - name: Prebuild Android project
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || 'MISSING_GOOGLE_MAPS_KEY' }}
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK (arm64)
+        working-directory: mobile/android
+        env:
+          NODE_ENV: production
+          EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EXPO_PUBLIC_GEMINI_MODEL: gemini-3.1-flash-lite
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Rename APK
+        run: |
+          mkdir -p ../dist-apk
+          cp android/app/build/outputs/apk/release/app-release.apk "../dist-apk/hara-${GITHUB_SHA::7}.apk"
+          ls -la ../dist-apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hara-apk
+          path: dist-apk/*.apk
+          retention-days: 14
+          if-no-files-found: error
