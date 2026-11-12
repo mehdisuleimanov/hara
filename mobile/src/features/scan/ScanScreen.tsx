@@ -205,8 +205,9 @@ export function ScanScreen() {
 
   const bottomPad = Math.max(insets.bottom, 12) + 4;
   // landscape photos are shown uncropped (all boxes visible); tall ones are cropped to fit
-  const imgH = frame ? Math.min(stageFinal - 26, Math.max(insets.top + 180, Math.round((W * frame.ih) / frame.iw))) : stageFinal - 26;
-  const stageH = imgH + 26; // the sheet overlaps this navy strip, never the photo
+  const headerH = insets.top + 76;
+  const imgH = frame ? Math.min(stageFinal - 26, Math.max(200, Math.round((W * frame.ih) / frame.iw))) : stageFinal - 26;
+  const stageH = headerH + imgH + 26; // photo sits under the header; the sheet overlaps only the navy strip
 
   return (
     <View style={{ flex: 1, backgroundColor: C.navy }}>
@@ -229,8 +230,10 @@ export function ScanScreen() {
           />
         </View>
       ) : (
-        <View style={{ width: W, height: stageH, overflow: 'hidden', backgroundColor: C.navy }}>
-          {frame ? <Stage key={frame.sampleId ?? 'live'} source={frame.source} iw={frame.iw} ih={frame.ih} w={W} h={imgH} phase={phase} boxes={result?.attrs.boxes ?? []} /> : null}
+        <View style={{ width: W, height: stageH, backgroundColor: C.navy }}>
+          <View style={{ position: 'absolute', left: 0, top: headerH, width: W, height: imgH + 26, overflow: 'hidden' }}>
+            {frame ? <Stage key={frame.sampleId ?? 'live'} source={frame.source} iw={frame.iw} ih={frame.ih} w={W} h={imgH} phase={phase} boxes={result?.attrs.boxes ?? []} /> : null}
+          </View>
         </View>
       )}
 
