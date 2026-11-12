@@ -117,13 +117,26 @@ function areaCounts(lat: number, lon: number, radiusM: number) {
 
 // ---------- tool implementations ----------
 
+const LEG_WORD: Record<string, string> = { walk: 'walk', metro: 'metro', bus: 'bus', taxi: 'taxi', scooter: 'scooter', bike: 'bike' };
+
 function optionJson(o: RouteOption, night: boolean): Json {
   const lm = o.lastMeters;
-  const metro = o.legs.find((l) => l.mode === 'metro');
+  const legs = o.legs.map((l) => {
+    const stops = l.mode === 'metro' ? (l.stations && l.stations.length > 1 ? l.stations.length - 1 : Number(/(\d+)\s*dayanacaq/.exec(l.label ?? '')?.[1] ?? 0) || undefined) : undefined;
+    return {
+      mode: LEG_WORD[l.mode] ?? l.mode,
+      meters: Math.round(l.distanceM),
+      minutes: l.durationMin || undefined,
+      metro_stops: stops,
+      line: l.mode === 'bus' ? l.label : undefined,
+      stations: l.stations?.map((st) => st.name),
+    };
+  }).filter((l) => !(l.mode === 'walk' && l.meters < 30));
   return {
     kind: o.kind,
     summary: summary(o),
-    minutes: o.durationMin,
+    legs,
+    total_minutes: o.durationMin,
     price: o.price,
     co2_g: o.co2g,
     safety_score: score(o, night),
@@ -131,7 +144,6 @@ function optionJson(o: RouteOption, night: boolean): Json {
     risky_crossings_avoided: o.avoided,
     reasons: o.reasons,
     warning: o.warning,
-    metro_stations: metro?.stations?.map((s) => s.name),
     last_meters: lm
       ? { wrong_side: lm.wrongSide, lanes: lm.lanes, street: lm.street, note: lm.note, extra_walk_min: lm.extraMin }
       : undefined,
