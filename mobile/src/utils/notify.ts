@@ -83,7 +83,7 @@ export async function triggerFamilyArrival(name = 'Nənə') {
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `${name} evə çatdı ✓`,
+        title: `${name} evə çatdı`,
         body: 'Hara Ailə · Səfər 22:04-də bitdi · Marşrut balı 92 · İşıqforsuz keçid olmadı',
         color: '#71FBC8',
         data: { kind: 'family' },

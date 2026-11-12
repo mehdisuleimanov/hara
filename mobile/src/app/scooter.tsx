@@ -30,7 +30,7 @@ function useWind() {
   const live = useWeather();
   const storeSpeed = useAppStore((s) => s.windSpeed);
   const storeGust = useAppStore((s) => s.windGust);
-  const flag = useAppStore((s) => (s as unknown as { windManual?: boolean }).windManual);
+  const flag = useAppStore((s) => s.windManual);
   const manual = flag === true || storeSpeed !== STORE_DEFAULT.speed || storeGust !== STORE_DEFAULT.gust;
   if (manual || (live && live.source === 'store')) {
     return { ready: true, speed: storeSpeed, gust: storeGust, dir: live?.windDir ?? 340, temp: live?.tempC ?? null, live: false };

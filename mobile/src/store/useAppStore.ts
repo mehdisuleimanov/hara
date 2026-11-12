@@ -39,6 +39,8 @@ type State = {
   timeMode: TimeMode;
   windSpeed: number; // m/s
   windGust: number; // m/s
+  /** true once the wind was set by hand (developer panel); overrides live weather */
+  windManual: boolean;
   aiEnabled: boolean;
   navSpeed: number; // simulation multiplier
   profile: Profile;
@@ -70,6 +72,7 @@ const initial = {
   timeMode: 'auto' as TimeMode,
   windSpeed: 9,
   windGust: 13,
+  windManual: false,
   aiEnabled: true,
   navSpeed: 6,
   profile: 'daily' as Profile,
@@ -86,7 +89,7 @@ const initial = {
 export const useAppStore = create<State>((set, get) => ({
   ...initial,
   setTimeMode: (timeMode) => set({ timeMode }),
-  setWind: (windSpeed) => set({ windSpeed, windGust: Math.round(windSpeed * 1.5) }),
+  setWind: (windSpeed) => set({ windSpeed, windGust: Math.round(windSpeed * 1.5), windManual: true }),
   setAiEnabled: (aiEnabled) => set({ aiEnabled }),
   setNavSpeed: (navSpeed) => set({ navSpeed }),
   setProfile: (profile) => set({ profile }),
