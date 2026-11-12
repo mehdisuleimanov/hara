@@ -1,4 +1,4 @@
-import React, { forwardRef, memo, useImperativeHandle, useMemo, useRef } from 'react';
+import React, { forwardRef, memo, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import MapView, { Circle, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MAP_STYLE } from '@/components/mapStyle';
@@ -18,10 +18,19 @@ export const CityMap = memo(
     ref,
   ) {
     const map = useRef<MapView>(null);
+    // dot size follows the zoom: visible over the whole city, precise when zoomed in
+    const [delta, setDelta] = useState(CENTER.latitudeDelta);
     useImperativeHandle(ref, () => ({
-      flyTo: (lat, lon, delta = 0.012) => map.current?.animateToRegion({ latitude: lat, longitude: lon, latitudeDelta: delta, longitudeDelta: delta }, 700),
-      overview: () => map.current?.animateToRegion(CENTER, 700),
+      flyTo: (lat, lon, d = 0.012) => {
+        setDelta(d);
+        map.current?.animateToRegion({ latitude: lat, longitude: lon, latitudeDelta: d, longitudeDelta: d }, 700);
+      },
+      overview: () => {
+        setDelta(CENTER.latitudeDelta);
+        map.current?.animateToRegion(CENTER, 700);
+      },
     }));
+    const dotR = Math.max(28, Math.min(160, delta * 1200));
 
     // risk density: every at-grade crossing that is red in this mode (real layer scores)
     const riskHeat = useMemo(() => {
@@ -54,6 +63,7 @@ export const CityMap = memo(
           rotateEnabled={false}
           pitchEnabled={false}
           moveOnMarkerPress={false}
+          onRegionChangeComplete={(r) => setDelta((d) => (Math.abs(d - r.latitudeDelta) / d > 0.25 ? r.latitudeDelta : d))}
         >
           {layer === 'risk' ? (
             <Heatmap
@@ -78,7 +88,7 @@ export const CityMap = memo(
               <Circle
                 key={`${mode}-${s.idx}`}
                 center={{ latitude: s.lat, longitude: s.lon }}
-                radius={sel ? 75 : 120}
+                radius={sel ? dotR * 1.3 : dotR}
                 fillColor={layer === 'risk' ? scoreColor(s.score) : C.ai}
                 strokeColor="#FFFFFF"
                 strokeWidth={sel ? 4 : 2.5}
@@ -90,7 +100,7 @@ export const CityMap = memo(
             <Circle
               key={`halo-${selected.lat}-${selected.lon}`}
               center={{ latitude: selected.lat, longitude: selected.lon }}
-              radius={230}
+              radius={dotR * 4}
               fillColor="rgba(31,111,235,0.12)"
               strokeColor={C.route}
               strokeWidth={2}

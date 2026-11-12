@@ -394,7 +394,7 @@ export function CityScreen() {
                 {selBarrier.name}
               </Txt>
               <Txt v="bodyS" color={C.ink2}>
-                Pilləkənli keçid (yeraltı və ya yerüstü). {selBarrier.nearestAtGradeM ? `Ən yaxın yerüstü keçid ${fmt(selBarrier.nearestAtGradeM)} m aralıdadır.` : 'Yaxınlıqda yerüstü keçid yoxdur.'} Lift və ya pandus
+                Pilləkənli keçid (yeraltı və ya yerüstü). {selBarrier.nearestAtGradeM ? `Ən yaxın pilləkənsiz keçid ${fmt(selBarrier.nearestAtGradeM)} m aralıdadır.` : 'Yaxınlıqda pilləkənsiz keçid yoxdur.'} Lift və ya pandus
                 olmadan əlil və uşaq arabası üçün keçid yoxdur.
               </Txt>
             </Surface>
@@ -439,7 +439,7 @@ export function CityScreen() {
           }
         />
         <Txt v="bodyS" color={C.ink2}>
-          Bu yerlərdə yolu yalnız pilləkənli yeraltı və ya yerüstü keçidlə keçmək olur: 300 m daxilində səviyyədə keçid yoxdur. Əlil arabası və uşaq arabası üçün alternativ yoxdur. Sıra təxmini piyada axınına görədir.
+          Bu yerlərdə yolu yalnız pilləkənli yeraltı və ya yerüstü keçidlə keçmək olur: 300 m daxilində pilləkənsiz keçid yoxdur. Əlil arabası və uşaq arabası üçün alternativ yoxdur. Sıra təxmini piyada axınına görədir.
         </Txt>
         {ready ? (
           <View style={{ gap: 8 }}>
@@ -462,7 +462,7 @@ export function CityScreen() {
                       {b.name}
                     </Txt>
                     <Txt v="caption" color={C.muted}>
-                      {b.nearestAtGradeM ? `Ən yaxın yerüstü keçid: ${fmt(b.nearestAtGradeM)} m` : '1 km daxilində yerüstü keçid yoxdur'}
+                      {b.nearestAtGradeM ? `Ən yaxın pilləkənsiz keçid: ${fmt(b.nearestAtGradeM)} m` : '1 km daxilində pilləkənsiz keçid yoxdur'}
                     </Txt>
                   </View>
                   <Icon name="chevron-right" size={20} color={C.faint} />

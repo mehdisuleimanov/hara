@@ -72,26 +72,42 @@ function Beam({ h, active }: { h: number; active: boolean }) {
   );
 }
 
-function BoxView({ b, i, w, h, iw, ih, base }: { b: VisionBox; i: number; w: number; h: number; iw: number; ih: number; base: number }) {
-  // resizeMode="cover" math: the image is scaled to fill w×h and centered
+type Placed = { b: VisionBox; i: number; left: number; top: number; bw: number; bh: number; labelDy: number; alignRight: boolean };
+
+/**
+ * Maps 0–1000 boxes onto the cover-fitted photo and places each label pill where it
+ * doesn't collide with an earlier one (above → inside → below the box).
+ */
+function layoutBoxes(boxes: VisionBox[], w: number, h: number, iw: number, ih: number): Placed[] {
   const s = Math.max(w / iw, h / ih);
   const dw = iw * s, dh = ih * s;
   const ox = (w - dw) / 2, oy = (h - dh) / 2;
-  const [y0, x0, y1, x1] = b.box_2d;
-  let left = ox + (x0 / 1000) * dw;
-  let top = oy + (y0 / 1000) * dh;
-  let right = ox + (x1 / 1000) * dw;
-  let bottom = oy + (y1 / 1000) * dh;
-  left = Math.max(2, left);
-  top = Math.max(2, top);
-  right = Math.min(w - 2, right);
-  bottom = Math.min(h - 2, bottom);
-  const bw = right - left, bh = bottom - top;
-  if (bw < 6 || bh < 6) return null;
+  const pills: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const out: Placed[] = [];
+  boxes.forEach((b, i) => {
+    const [y0, x0, y1, x1] = b.box_2d;
+    const left = Math.max(2, ox + (x0 / 1000) * dw);
+    const top = Math.max(2, oy + (y0 / 1000) * dh);
+    const right = Math.min(w - 2, ox + (x1 / 1000) * dw);
+    const bottom = Math.min(h - 2, oy + (y1 / 1000) * dh);
+    const bw = right - left, bh = bottom - top;
+    if (bw < 6 || bh < 6) return;
+    const pw = BOX_LABEL_AZ[b.label].length * 6.6 + 18;
+    const alignRight = left + pw + 8 > w;
+    const px0 = alignRight ? right - pw : left;
+    const tries = [top > 26 ? -24 : null, 3, bottom + 24 < h ? bh + 3 : null].filter((v): v is number => v != null);
+    const free = (dy: number) => !pills.some((q) => px0 < q.x1 + 4 && px0 + pw + 4 > q.x0 && top + dy < q.y1 + 2 && top + dy + 21 + 2 > q.y0);
+    const dy = tries.find(free) ?? tries[0];
+    pills.push({ x0: px0, x1: px0 + pw, y0: top + dy, y1: top + dy + 21 });
+    out.push({ b, i, left, top, bw, bh, labelDy: dy, alignRight });
+  });
+  return out;
+}
+
+function BoxView({ p, base }: { p: Placed; base: number }) {
+  const { b, i, left, top, bw, bh, labelDy, alignRight } = p;
   const col = boxColor(b.label);
   const dark = col === '#FFFFFF';
-  const labelAbove = top > 26;
-  const alignRight = left + 130 > w; // keep the pill inside the frame
   const lite = prefs().liteFx;
   return (
     <Animated.View
@@ -107,7 +123,7 @@ function BoxView({ b, i, w, h, iw, ih, base }: { b: VisionBox; i: number; w: num
           flexDirection: 'row',
           justifyContent: alignRight ? 'flex-end' : 'flex-start',
           ...(alignRight ? { right: -1 } : { left: -1 }),
-          ...(labelAbove ? { top: -24 } : { top: 3 }),
+          top: labelDy,
         }}
       >
         <View style={{ paddingHorizontal: 8, height: 21, borderRadius: 7, backgroundColor: col, justifyContent: 'center' }}>
@@ -142,11 +158,12 @@ export function Stage({
   boxes: VisionBox[];
 }) {
   const shown = phase === 'done' ? boxes : [];
-  // biggest boxes first so small ones end up on top
-  const ordered = useMemo(
-    () => shown.map((b, i) => ({ b, i })).sort((p, q) => (q.b.box_2d[2] - q.b.box_2d[0]) * (q.b.box_2d[3] - q.b.box_2d[1]) - (p.b.box_2d[2] - p.b.box_2d[0]) * (p.b.box_2d[3] - p.b.box_2d[1])),
-    [shown],
-  );
+  // labels placed in the model's importance order; biggest boxes drawn first so small ones stay on top
+  const ordered = useMemo(() => {
+    const placed = layoutBoxes(shown, w, h, iw, ih);
+    const area = (p: Placed) => p.bw * p.bh;
+    return placed.sort((p, q) => area(q) - area(p));
+  }, [shown, w, h, iw, ih]);
   useEffect(() => {
     if (phase !== 'done' || !boxes.length) return;
     const step = prefs().liteFx ? 80 : BOX_STAGGER;
@@ -182,8 +199,8 @@ export function Stage({
       <Beam h={h} active={phase === 'scan'} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF' }, flashStyle]} />
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {ordered.map(({ b, i }) => (
-          <BoxView key={`${i}-${b.label}`} b={b} i={i} w={w} h={h} iw={iw} ih={ih} base={120} />
+        {ordered.map((p) => (
+          <BoxView key={`${p.i}-${p.b.label}`} p={p} base={120} />
         ))}
       </View>
     </View>
