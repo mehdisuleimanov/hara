@@ -1,0 +1,9 @@
+# editor
+.vscode/
+# OS
+.DS_Store
+Thumbs.db
+# secrets (also ignored inside mobile/)
+.env
+.env.*
+!.env.example
