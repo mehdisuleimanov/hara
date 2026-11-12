@@ -77,6 +77,17 @@ type TxtProps = TextProps & {
  * All app text. Scales with the accessibility mode (senior / low-vision) and remaps
  * colors in high contrast — so one tap restyles every screen.
  */
+/** Azerbaijani/Turkish-aware uppercase (i → İ, ı → I). */
+export function upperAz(s: string) {
+  return s.replace(/i/g, 'İ').toUpperCase();
+}
+
+function capsChildren(children: React.ReactNode): React.ReactNode {
+  if (typeof children === 'string') return upperAz(children);
+  if (Array.isArray(children)) return children.map((c) => (typeof c === 'string' ? upperAz(c) : c));
+  return children;
+}
+
 export function Txt({ v, w, size, color = C.ink, lh, ls, center, caps, style, children, ...rest }: TxtProps) {
   const t = useTheme();
   const base = v ? T[v] : undefined;
@@ -99,12 +110,11 @@ export function Txt({ v, w, size, color = C.ink, lh, ls, center, caps, style, ch
           lineHeight,
           letterSpacing,
           textAlign: center ? 'center' : undefined,
-          textTransform: caps || v === 'overline' ? 'uppercase' : undefined,
         },
         style,
       ]}
     >
-      {children}
+      {caps || v === 'overline' ? capsChildren(children) : children}
     </Text>
   );
 }

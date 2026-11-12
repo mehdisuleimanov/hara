@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { optionOf, summary } from '@/data/routes';
+import { lastMetersOf, optionOf, summary } from '@/data/routes';
 import { ScoreRing } from '@/components/ScoreRing';
 import { Icon, Txt } from '@/components/ui';
 import { PressableScale, enter } from '@/motion';
@@ -11,11 +11,15 @@ import { C, R } from '@/theme';
 
 /**
  * Proactive tip from Əhməd for the most frequent trip: the safest option, and why the
- * "fastest" taxi is a trap (drop-off on the far side of a 6-lane avenue). Data-driven.
+ * taxi is a trap (drop-off on the far side of a multi-lane avenue — from real lastMeters data).
  */
 export function SuggestionCard({ night, base = 0 }: { night: boolean; base?: number }) {
   const safe = optionOf('hilton', 'safest');
   const taxi = optionOf('hilton', 'fastest');
+  const lm = lastMetersOf('hilton');
+  const warnText = lm?.wrongSide
+    ? `Taksi səni qarşı tərəfdə düşürür: ${lm.street}, ${lm.lanes} zolaq, yaxında keçid yoxdur.`
+    : taxi?.warning;
   if (!safe) return null;
   const sc = night ? safe.scoreNight : safe.scoreDay;
   return (
@@ -64,11 +68,11 @@ export function SuggestionCard({ night, base = 0 }: { night: boolean; base?: num
             </Txt>
           </View>
         </View>
-        {taxi?.warning ? (
+        {warnText ? (
           <View style={styles.warn}>
             <Icon name="taxi" size={18} color={C.danger} />
             <Txt w="semi" size={13} color={C.ink2} style={{ flex: 1 }}>
-              Taksi daha tez çatdırır, amma səni Azadlıq prospektinin o biri tərəfində düşürür — 6 zolaq.
+              {warnText}
             </Txt>
             <Icon name="arrow-right" size={18} color={C.ink} />
           </View>
