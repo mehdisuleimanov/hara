@@ -5,8 +5,11 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  Easing,
   withDelay,
+  withSequence,
   withSpring,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -80,8 +83,21 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
 
   // bubble pops in once the greeting starts
   const bubble = useSharedValue(0);
+  const hop = useSharedValue(0);
+  const hopA = useAnimatedStyle(() => ({
+    transform: [{ translateY: -22 * hop.value }, { rotate: `${-4 * hop.value}deg` }, { scaleY: 1 + 0.03 * hop.value }],
+  }));
   useEffect(() => {
-    if (greet) bubble.value = withSpring(1, SPRING.bouncy);
+    if (!greet) return;
+    bubble.value = withSpring(1, SPRING.bouncy);
+    // happy hop as he says hello
+    hop.value = withSequence(
+      withTiming(1, { duration: 170, easing: Easing.out(Easing.quad) }),
+      withSpring(0, { damping: 7, stiffness: 260 }),
+      withDelay(260, withTiming(0.55, { duration: 140, easing: Easing.out(Easing.quad) })),
+      withSpring(0, { damping: 8, stiffness: 240 }),
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }, [greet, bubble]);
   const bubbleA = useAnimatedStyle(() => ({
     opacity: bubble.value,
@@ -99,7 +115,9 @@ export function MeetAhmed({ scrollX, w, active }: { scrollX: SharedValue<number>
           <View style={styles.bubbleTail} />
         </Animated.View>
         <Animated.View entering={enter(0, 'pop', 150)}>
-          <OnboardingMascot pose="wave" size={Math.min(w * 0.62, 270)} speaking={voice.speaking} />
+          <Animated.View style={hopA}>
+            <OnboardingMascot pose="wave" size={Math.min(w * 0.62, 270)} speaking={voice.speaking} />
+          </Animated.View>
         </Animated.View>
       </Animated.View>
       <Copy
