@@ -26,7 +26,7 @@ export function ToastHost() {
       style={[styles.wrap, { top: insets.top + 8, transform: [{ translateY: y }] }]}
     >
       <Icon name={toast.icon ?? 'check-circle'} size={22} color={C.brand} />
-      <Txt w="bold" size={15} color="#fff">
+      <Txt w="bold" size={15} color="#FFFFFF">
         {toast.text}
       </Txt>
     </Animated.View>

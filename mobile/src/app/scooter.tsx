@@ -7,10 +7,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppStore, GUST_LIMIT, SEAFRONT_WIND_LIMIT } from '@/store/useAppStore';
 import { ROUTES } from '@/data/routes';
-import { MAP_STYLE } from '@/components/mapStyle';
+import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
 import { DestPin, OriginPin } from '@/components/RouteLines';
 import { AhmedAvatar } from '@/components/Brand';
-import { CircleButton, DemoBadge, Icon, PillButton, Tag, Txt } from '@/components/ui';
+import { CircleButton, DemoBadge, Heading, Icon, PillButton, Tag, Txt } from '@/components/ui';
 import { regionFor, toLatLngs } from '@/utils/geo';
 import { speak, stopSpeaking } from '@/utils/tts';
 import { C, R } from '@/theme';
@@ -25,6 +25,7 @@ export default function Scooter() {
   const sea = useMemo(() => toLatLngs(s.seafront.c), [s]);
   const calm = useMemo(() => toLatLngs(s.calm.c), [s]);
   const region = useMemo(() => regionFor([...sea, ...calm], 1.35), [sea, calm]);
+  const sat = useSatelliteType(region.latitudeDelta);
 
   const banned = gust > GUST_LIMIT;
   const useCalm = wind > SEAFRONT_WIND_LIMIT;
@@ -65,22 +66,20 @@ export default function Scooter() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
           <Icon name="scooter" size={30} />
-          <Txt w="black" size={28} style={{ flex: 1 }}>
-            Skuter rejimi
-          </Txt>
+          <Heading light="Skuter" bold="rejimi" size={28} style={{ flex: 1 }} />
           <DemoBadge />
         </View>
 
         {/* wind card */}
         <View style={[styles.wind, banned && { backgroundColor: C.danger }]}>
           <View style={styles.windIcon}>
-            <Icon name="weather-windy" size={30} color={banned ? C.danger : C.brand} />
+            <Icon name="weather-windy" size={30} color={banned ? C.danger : C.navy} />
           </View>
           <View style={{ flex: 1 }}>
-            <Txt w="xbold" size={19} color="#fff">
+            <Txt w="xbold" size={19} color={C.ink}>
               Külək {wind} m/s · qasırğa {gust} m/s
             </Txt>
-            <Txt w="med" size={14} color="rgba(255,255,255,0.75)">
+            <Txt w="med" size={14} color={C.muted}>
               Şimal-qərbdən · Xəzri
             </Txt>
           </View>
@@ -91,7 +90,7 @@ export default function Scooter() {
             <Txt w="semi" size={13} color={C.muted}>
               KÜLƏYİ DƏYİŞ (demo)
             </Txt>
-            <Txt w="bold" size={13} color={banned ? C.danger : useCalm ? C.brand : C.safe}>
+            <Txt w="bold" size={13} color={banned ? C.danger : useCalm ? C.ink : C.safe}>
               {banned ? 'Skuter gizlədildi' : useCalm ? 'Daxili küçələr' : 'Dənizkənarı'}
             </Txt>
           </View>
@@ -108,12 +107,12 @@ export default function Scooter() {
         </View>
 
         <View style={styles.mapWrap}>
-          <MapView provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} customMapStyle={MAP_STYLE} initialRegion={region} toolbarEnabled={false}>
+          <MapView provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} mapType={sat.mapType} onRegionChangeComplete={sat.onRegionChangeComplete} customMapStyle={MAP_STYLE_FOR_TYPE} initialRegion={region} toolbarEnabled={false}>
             {!banned ? (
               <>
                 <Polyline coordinates={other} strokeColor="#9A9AA0" strokeWidth={5} lineDashPattern={[8, 8]} zIndex={2} />
-                <Polyline coordinates={chosen} strokeColor="rgba(255,98,3,0.2)" strokeWidth={16} zIndex={3} lineCap="round" />
-                <Polyline coordinates={chosen} strokeColor={C.brand} strokeWidth={7} zIndex={4} lineCap="round" lineJoin="round" />
+                <Polyline coordinates={chosen} strokeColor={C.halo} strokeWidth={16} zIndex={3} lineCap="round" />
+                <Polyline coordinates={chosen} strokeColor={C.route} strokeWidth={7} zIndex={4} lineCap="round" lineJoin="round" />
                 {mid ? (
                   <Marker coordinate={mid} anchor={{ x: 0.5, y: 1.2 }} tracksViewChanges={false}>
                     <View style={styles.label}>
@@ -170,10 +169,10 @@ export default function Scooter() {
 }
 
 const styles = StyleSheet.create({
-  wind: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.black, borderRadius: R.lg, padding: 16, marginTop: 18 },
-  windIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  wind: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.purple, borderRadius: R.lg, padding: 16, marginTop: 18 },
+  windIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
   sliderCard: { backgroundColor: C.surface, borderRadius: R.lg, padding: 16, paddingBottom: 8, marginTop: 10 },
   mapWrap: { height: 330, borderRadius: R.card, overflow: 'hidden', marginTop: 12, backgroundColor: C.surface },
-  label: { backgroundColor: '#fff', borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1.5, borderColor: C.brand },
+  label: { backgroundColor: C.surface, borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1.5, borderColor: C.brand },
   tip: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderRadius: R.lg, padding: 14, marginTop: 12 },
 });

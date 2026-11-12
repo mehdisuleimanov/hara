@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#F2F2F4",
+    "backgroundColor": "#FFFFFF",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "az.hara.app"

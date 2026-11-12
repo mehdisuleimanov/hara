@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { ROUTES } from '@/data/routes';
 import { destById } from '@/data/destinations';
-import { MAP_STYLE } from '@/components/mapStyle';
+import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
 import { DestPin, OriginPin } from '@/components/RouteLines';
-import { CircleButton, DemoBadge, Icon, PillButton, Tag, Txt } from '@/components/ui';
+import { CircleButton, DemoBadge, Icon, PillButton, Tag, Txt, Heading } from '@/components/ui';
 import { regionFor, toLatLngs } from '@/utils/geo';
 import { C, R } from '@/theme';
 
@@ -27,6 +27,7 @@ export default function Accessible() {
   const hilton = destById('hilton')!;
   const legs = useMemo(() => a.legs.map((l) => ({ mode: l.mode, pts: toLatLngs(l.c) })), [a]);
   const region = useMemo(() => regionFor(legs.flatMap((l) => l.pts), 1.4), [legs]);
+  const sat = useSatelliteType(region.latitudeDelta);
   const walkM = a.legs.filter((l) => l.mode === 'walk').reduce((s, l) => s + l.distanceM, 0);
 
   return (
@@ -34,13 +35,11 @@ export default function Accessible() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: 40 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
-          <Tag label="Əlçatan rejim" icon="wheelchair-accessibility" bg={C.brand} color="#fff" style={{ height: 40, paddingHorizontal: 16 }} />
+          <Tag label="Əlçatan rejim" icon="wheelchair-accessibility" bg={C.brand} color={C.navy} style={{ height: 40, paddingHorizontal: 16 }} />
           <View style={{ flex: 1 }} />
           <DemoBadge />
         </View>
-        <Txt w="black" size={34} lh={38} style={{ marginTop: 18 }}>
-          Pilləkənsiz{'\n'}marşrut
-        </Txt>
+        <Heading light="Pilləkənsiz" bold="marşrut" size={34} newline style={{ marginTop: 18 }} />
         <Txt w="semi" size={15} color={C.muted} style={{ marginTop: 6 }}>
           Nizami m. → Hilton Baku · 27 dəq · {Math.round(walkM / 10) * 10} m piyada
         </Txt>
@@ -49,17 +48,15 @@ export default function Accessible() {
           <MapView
             provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
-            customMapStyle={MAP_STYLE}
+            mapType={sat.mapType} onRegionChangeComplete={sat.onRegionChangeComplete} customMapStyle={MAP_STYLE_FOR_TYPE}
             initialRegion={region}
-            scrollEnabled={false}
-            zoomEnabled={false}
             toolbarEnabled={false}
           >
             {legs.map((l, i) => (
               <Polyline
                 key={i}
                 coordinates={l.pts}
-                strokeColor={l.mode === 'metro' ? C.metro : C.brand}
+                strokeColor={l.mode === 'metro' ? C.metro : C.navy}
                 strokeWidth={6}
                 lineDashPattern={l.mode === 'metro' ? [2, 10] : undefined}
                 lineCap="round"
@@ -86,7 +83,7 @@ export default function Accessible() {
                   </Txt>
                   <Tag label={s.status} bg={s.ok ? C.safeSoft : C.dangerSoft} color={s.ok ? C.safe : C.danger} />
                 </View>
-                <Txt w="med" size={13.5} color={s.ok ? C.muted : C.brand} style={{ marginTop: 2 }}>
+                <Txt w="med" size={13.5} color={s.ok ? C.muted : C.ink2} style={{ marginTop: 2 }}>
                   {s.sub}
                 </Txt>
               </View>
@@ -102,7 +99,7 @@ export default function Accessible() {
 
         <View style={[styles.card, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}>
           <View style={styles.escort}>
-            <Icon name="human-wheelchair" size={32} color={C.brand} />
+            <Icon name="human-wheelchair" size={32} color={C.navy} />
           </View>
           <View style={{ flex: 1 }}>
             <Txt w="xbold" size={18}>
@@ -135,7 +132,7 @@ export default function Accessible() {
         <View style={styles.backdrop}>
           <View style={styles.modal}>
             <View style={styles.okIcon}>
-              <Icon name="check-bold" size={40} color="#fff" />
+              <Icon name="check-bold" size={40} color={C.ink} />
             </View>
             <Txt w="black" size={24} center style={{ marginTop: 14 }}>
               Müşayiət sifariş edildi

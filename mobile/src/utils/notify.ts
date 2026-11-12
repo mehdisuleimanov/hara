@@ -63,7 +63,7 @@ export async function showNavNotification(title: string, body: string) {
         body,
         sticky: true,
         autoDismiss: false,
-        color: '#FF6203',
+        color: '#71FBC8',
         sound: false,
         data: { kind: 'nav' },
       },
@@ -85,7 +85,7 @@ export async function triggerFamilyArrival(name = 'Nənə') {
       content: {
         title: `${name} evə çatdı ✓`,
         body: 'Hara Ailə · Səfər 22:04-də bitdi · Marşrut balı 92 · İşıqforsuz keçid olmadı',
-        color: '#FF6203',
+        color: '#71FBC8',
         data: { kind: 'family' },
       },
       trigger: Platform.OS === 'android' ? { channelId: 'family' } : null,

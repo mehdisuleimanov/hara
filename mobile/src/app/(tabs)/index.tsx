@@ -2,19 +2,20 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ChevronFlow, FadeIn, Float, MarchingPath, Pulse } from '@/components/anim';
 import { useAppStore, useIsNight } from '@/store/useAppStore';
 import { DESTINATIONS, RECENT_IDS, destById } from '@/data/destinations';
 import { optionOf } from '@/data/routes';
-import { AhmedAvatar, Avatar } from '@/components/Brand';
+import { AhmedAvatar, Avatar, HaraWordmark } from '@/components/Brand';
 import { ScoreRing } from '@/components/ScoreRing';
-import { Chip, CircleButton, Icon, Tag, Txt, tap } from '@/components/ui';
+import { Chevrons, Chip, CircleButton, Heading, Icon, Tag, Txt, tap } from '@/components/ui';
 import { TAB_BAR_SPACE } from '@/components/TabBar';
-import { C, R, shadow } from '@/theme';
+import { fmtDist } from '@/utils/geo';
+import { C, R } from '@/theme';
 import type { Profile } from '@/data/types';
 
 const MODES: { id: Profile; label: string; icon: string; route?: string }[] = [
-  { id: 'daily', label: 'Gündəlik', icon: 'walk' },
+  { id: 'daily', label: 'Piyada', icon: 'walk' },
   { id: 'accessible', label: 'Əlçatan', icon: 'wheelchair-accessibility', route: '/accessible' },
   { id: 'scooter', label: 'Skuter', icon: 'scooter', route: '/scooter' },
   { id: 'family', label: 'Ailə', icon: 'account-group-outline', route: '/family' },
@@ -26,49 +27,51 @@ export default function Home() {
   const profile = useAppStore((s) => s.profile);
   const setProfile = useAppStore((s) => s.setProfile);
   const setDemo = useAppStore((s) => s.setDemoPanelOpen);
-  const wind = useAppStore((s) => s.windSpeed);
-  const reports = useAppStore((s) => s.reports);
-  const hilton = optionOf('hilton', 'safest');
-  const heroScore = hilton ? (night ? hilton.scoreNight : hilton.scoreDay) : 92;
+  const hero = destById('hilton')!;
+  const opt = optionOf('hilton', 'safest');
+  const heroScore = opt ? (night ? opt.scoreNight : opt.scoreDay) : 92;
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: TAB_BAR_SPACE + 20, paddingHorizontal: 18 }}
+      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: TAB_BAR_SPACE + 24, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* top bar */}
+      {/* top bar: gray menu circle · pill with "··" + avatar */}
       <View style={styles.row}>
-        <CircleButton icon="menu" size={54} onLongPress={() => setDemo(true)} onPress={() => router.navigate('/profile')} />
+        <CircleButton icon="menu" size={56} bg={C.bg2} onLongPress={() => setDemo(true)} onPress={() => router.navigate('/profile')} />
+        <HaraWordmark width={96} />
         <View style={styles.topRight}>
-          <CircleButton icon="bell-outline" size={44} bg={C.bg} onPress={() => router.push('/map')} />
-          <Avatar size={44} />
+          <CircleButton icon="dots-horizontal" size={52} bg={C.bg2} label="Daha çox" onPress={() => router.navigate('/map')} />
+          <Avatar size={56} />
         </View>
       </View>
 
-      {/* greeting + search */}
-      <View style={[styles.row, { marginTop: 20, alignItems: 'flex-end' }]}>
-        <View style={{ flex: 1 }}>
-          <Txt w="semi" size={16} color={C.ink2}>
+      {/* greeting + heading + tall search pill */}
+      <FadeIn index={0}>
+      <View style={[styles.row, { marginTop: 22, alignItems: 'center' }]}>
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Txt w="semi" size={15} color={C.ink2}>
             Salam, Aysel 👋
           </Txt>
-          <Txt w="black" size={38} lh={42} style={{ marginTop: 6 }}>
-            Bu gün{'\n'}hara gedirsən?
-          </Txt>
+          <Heading light="Bakıda Təhlükəsiz" bold="Yol Tap" size={34} newline style={{ marginTop: 8 }} />
         </View>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Axtar"
           onPress={() => {
             tap();
             router.push('/ahmed?mode=text');
           }}
-          style={styles.searchPill}
+          style={({ pressed }) => [styles.searchPill, { opacity: pressed ? 0.75 : 1 }]}
         >
           <Icon name="magnify" size={26} />
         </Pressable>
       </View>
+      </FadeIn>
 
-      {/* modes */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 20, marginHorizontal: -18 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 18 }}>
+      {/* modes: active = white pill with amber disc; others = round */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 20, marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
         {MODES.map((m) => (
           <Chip
             key={m.id}
@@ -83,191 +86,175 @@ export default function Home() {
         ))}
       </ScrollView>
 
-      {/* hero card */}
-      <LinearGradient colors={[C.brand, '#FF7A2B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      {/* purple hero card */}
+      <FadeIn index={2}>
+      <View style={styles.hero}>
         <View style={styles.row}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Tag label={night ? 'Gecə rejimi' : 'Gündüz rejimi'} icon={night ? 'weather-night' : 'white-balance-sunny'} bg="rgba(255,255,255,0.22)" color="#fff" />
-            <Tag label={`${wind} m/s külək`} icon="weather-windy" bg="rgba(255,255,255,0.22)" color="#fff" />
+            <Tag label={`${opt?.durationMin ?? 14} dəq`} bg={C.purpleLight} color={C.ink} style={styles.heroTag} />
+            <Tag label={night ? 'Gecə rejimi' : 'Ən təhlükəsiz'} bg={C.purpleLight} color={C.ink} style={styles.heroTag} />
           </View>
-          <CircleButton icon="arrow-top-right" size={46} onPress={() => router.push('/results/hilton')} />
+          <CircleButton icon="arrow-top-right" size={52} onPress={() => router.push('/results/hilton')} />
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 14 }}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Icon name="map-marker" size={16} color="rgba(255,255,255,0.9)" />
-              <Txt w="semi" size={13.5} color="rgba(255,255,255,0.9)">
-                Bakı · 28 May m. yaxınlığı
-              </Txt>
-            </View>
-            <Txt w="black" size={30} lh={34} color="#fff" style={{ marginTop: 6 }}>
-              {night ? 'Yalnız işıqlı\nküçələrlə' : 'Ən təhlükəsiz\nyolla get'}
-            </Txt>
-            <Txt w="med" size={14} color="rgba(255,255,255,0.9)" style={{ marginTop: 8 }}>
-              {night ? 'İşıqforlu keçidlər, işıqlı səkilər' : 'Keçidlər, işıqfor və səkilər yoxlanılır'}
+
+        <View style={{ marginTop: 18 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="map-marker-outline" size={16} />
+            <Txt w="semi" size={13.5} color={C.ink2}>
+              Bakı · {hero.district.split(' · ')[0]}
             </Txt>
           </View>
-          <View style={styles.heroRing}>
-            <ScoreRing score={heroScore} size={74} />
+          <Heading light={hero.name.split(' ')[0]} bold={hero.name.split(' ').slice(1).join(' ')} size={32} newline style={{ marginTop: 4 }} />
+        </View>
+
+        {/* illustration panel (reference: 3D bus) — Əhməd + dashed path + pin */}
+        <View style={styles.illu}>
+          <MarchingPath d="M4 62 C 40 60, 60 20, 100 26 S 138 12, 142 10" width={150} height={70} />
+          <View style={styles.illuPin}>
+            <Icon name="map-marker" size={30} color={C.ink} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+            <Float>
+              <AhmedAvatar size={104} full />
+            </Float>
+            <View style={{ paddingBottom: 12 }}>
+              <ScoreRing score={heroScore} size={62} />
+            </View>
           </View>
         </View>
 
-        {/* talk to Əhməd slider-like pill */}
-        <Pressable
-          onPress={() => {
-            tap();
-            router.push('/ahmed');
-          }}
-          style={styles.talk}
-        >
-          <View style={styles.talkMic}>
-            <Icon name="microphone" size={26} color="#fff" />
+        {/* reference bottom row: amber slider · ››› · white disc · black clock disc · hours/km */}
+        <View style={styles.heroBottom}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Əhmədə səslə de"
+            onPress={() => {
+              tap();
+              router.push('/ahmed');
+            }}
+            style={styles.slideKnobWrap}
+          >
+            <Pulse size={52} color={C.navy} style={{ right: 6 }} />
+            <View style={styles.slideKnob}>
+              <Icon name="microphone" size={24} />
+            </View>
+          </Pressable>
+          <ChevronFlow color={C.ink} />
+          <CircleButton icon="map-marker-path" size={52} label="Marşrutlar" onPress={() => router.push('/results/hilton')} />
+          <View style={styles.clock}>
+            <Icon name="clock-outline" size={24} color={C.brand} />
           </View>
-          <Txt w="bold" size={18} color={C.brand} style={{ letterSpacing: 2 }}>
-            ›››
-          </Txt>
-          <View style={styles.talkAhmed}>
-            <AhmedAvatar size={34} />
-          </View>
-          <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: 8 }}>
-            <Txt w="bold" size={15} color={C.ink}>
-              Əhmədə de
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <Txt w="med" size={12.5} color={C.ink2}>
+              {opt?.durationMin ?? 14} dəqiqə
             </Txt>
-            <Txt w="med" size={12.5} color={C.muted}>
-              səslə və ya yazı ilə
+            <Txt w="bold" size={15}>
+              {fmtDist(opt?.distanceM ?? 1100)}
             </Txt>
           </View>
-        </Pressable>
-      </LinearGradient>
+        </View>
+      </View>
+      </FadeIn>
+
+      {/* reference second row: "12 days · Both Ways ↗" */}
+      <FadeIn index={3}>
+      <View style={styles.subRow}>
+        <Tag label={night ? 'İşıqlı küçələr' : 'İşıqforlu keçidlər'} bg={C.bg2} color={C.ink} style={styles.subTag} />
+        <Tag label="Pilləkənsiz" bg={C.bg2} color={C.ink} style={styles.subTag} />
+        <View style={{ flex: 1 }} />
+        <CircleButton icon="arrow-top-right" size={48} bg={C.bg2} onPress={() => router.push('/accessible')} />
+      </View>
+      </FadeIn>
 
       {/* recents */}
-      <View style={[styles.row, { marginTop: 26, marginBottom: 12 }]}>
-        <Txt w="xbold" size={22}>
-          Son yerlər
-        </Txt>
-        <Pressable onPress={() => router.push('/ahmed?mode=text')}>
-          <Txt w="semi" size={14} color={C.brand}>
+      <View style={[styles.row, { marginTop: 24, marginBottom: 12 }]}>
+        <Heading bold="Son yerlər" size={22} />
+        <Pressable accessibilityRole="button" onPress={() => router.push('/ahmed?mode=text')} hitSlop={8} style={styles.allBtn}>
+          <Txt w="semi" size={13.5}>
             Hamısı
           </Txt>
+          <Icon name="arrow-right" size={16} />
         </Pressable>
       </View>
       <View style={{ gap: 10 }}>
-        {RECENT_IDS.map((id) => {
+        {[...RECENT_IDS, ...DESTINATIONS.filter((d) => !RECENT_IDS.includes(d.id) && d.id !== 'hilton').map((d) => d.id).slice(0, 2)].map((id, idx) => {
           const d = destById(id)!;
           const o = optionOf(id, 'safest');
           return (
+            <FadeIn key={id} index={4 + idx}>
             <Pressable
-              key={id}
+              accessibilityRole="button"
+              accessibilityLabel={`${d.name}, ${d.district}`}
               onPress={() => {
                 tap();
                 router.push(`/results/${id}`);
               }}
-              style={styles.place}
+              style={({ pressed }) => [styles.place, { opacity: pressed ? 0.85 : 1 }]}
             >
               <View style={styles.placeIcon}>
-                <Icon name={d.icon} size={24} color={C.ink} />
+                <Icon name={d.icon} size={24} />
               </View>
               <View style={{ flex: 1 }}>
-                <Txt w="bold" size={16.5}>
+                <Txt w="bold" size={16}>
                   {d.name}
                 </Txt>
                 <Txt w="med" size={13.5} color={C.muted}>
                   {d.district}
                 </Txt>
               </View>
-              {o ? <ScoreRing score={night ? o.scoreNight : o.scoreDay} size={42} showShield={false} /> : null}
+              {o ? <ScoreRing score={night ? o.scoreNight : o.scoreDay} size={44} showShield={false} /> : null}
               <View style={styles.arrow}>
-                <Icon name="arrow-top-right" size={20} color="#fff" />
+                <Icon name="arrow-top-right" size={20} color={C.brand} />
               </View>
             </Pressable>
+            </FadeIn>
           );
         })}
       </View>
-
-      {/* nearby reports */}
-      <Pressable onPress={() => router.push('/map')} style={styles.nearby}>
-        <View style={styles.dot} />
-        <View style={{ flex: 1 }}>
-          <Txt w="bold" size={16} color="#fff">
-            Yaxınlıqda {Math.min(3, reports.length)} yeni bildiriş
-          </Txt>
-          <Txt w="med" size={13} color="rgba(255,255,255,0.65)">
-            AI təsdiqlədi · 5 dəq əvvəl
-          </Txt>
-        </View>
-        <Icon name="chevron-right" size={24} color="#fff" />
-      </Pressable>
-
-      {/* all destinations */}
-      <Txt w="xbold" size={22} style={{ marginTop: 26, marginBottom: 12 }}>
-        Populyar
-      </Txt>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -18 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 18 }}>
-        {DESTINATIONS.filter((d) => !RECENT_IDS.includes(d.id)).map((d) => (
-          <Pressable key={d.id} onPress={() => router.push(`/results/${d.id}`)} style={styles.popular}>
-            <View style={styles.placeIcon}>
-              <Icon name={d.icon} size={22} />
-            </View>
-            <Txt w="bold" size={15} style={{ marginTop: 12 }} numberOfLines={1}>
-              {d.short}
-            </Txt>
-            <Txt w="med" size={12.5} color={C.muted} numberOfLines={1}>
-              {d.district.split(' · ')[0]}
-            </Txt>
-          </Pressable>
-        ))}
-      </ScrollView>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.surface, borderRadius: R.pill, padding: 5 },
+  topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg2, borderRadius: R.pill, paddingLeft: 2 },
   searchPill: {
     width: 64,
-    height: 92,
+    height: 100,
     borderRadius: 32,
-    backgroundColor: C.surface,
+    backgroundColor: C.bg2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
-  hero: { marginTop: 18, borderRadius: 34, padding: 18, paddingBottom: 14 },
-  heroRing: { backgroundColor: '#fff', borderRadius: 50, padding: 6, ...shadow(2) },
-  talk: {
-    marginTop: 18,
+  hero: { marginTop: 18, borderRadius: R.card, padding: 16, backgroundColor: C.purple },
+  heroTag: { height: 40, paddingHorizontal: 16 },
+  illu: {
+    marginTop: 14,
+    height: 132,
+    borderRadius: 26,
+    backgroundColor: C.purpleLight,
+    paddingHorizontal: 16,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  illuPin: { position: 'absolute', right: 14, top: 0 },
+  heroBottom: {
+    marginTop: 12,
     height: 64,
     borderRadius: R.pill,
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 6,
-    gap: 10,
-  },
-  talkMic: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
-  talkAhmed: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  place: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
     backgroundColor: C.surface,
-    borderRadius: R.lg,
-    padding: 10,
-    paddingRight: 10,
-  },
-  placeIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  arrow: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.black, alignItems: 'center', justifyContent: 'center' },
-  nearby: {
-    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    backgroundColor: C.black,
-    borderRadius: R.lg,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    gap: 8,
+    paddingRight: 14,
   },
-  dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.brand },
-  popular: { width: 140, backgroundColor: C.surface, borderRadius: R.lg, padding: 14 },
+  slideKnobWrap: { height: 64, width: 108, borderRadius: R.pill, backgroundColor: C.brand, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 6 },
+  slideKnob: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
+  clock: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.black, alignItems: 'center', justifyContent: 'center' },
+  subRow: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: R.pill, padding: 8 },
+  subTag: { height: 44, paddingHorizontal: 18 },
+  allBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.surface, borderRadius: R.pill, paddingHorizontal: 14, height: 40 },
+  place: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.surface, borderRadius: R.lg, padding: 10 },
+  placeIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  arrow: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.black, alignItems: 'center', justifyContent: 'center' },
 });

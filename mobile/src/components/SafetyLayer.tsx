@@ -1,8 +1,7 @@
 import React, { memo } from 'react';
 import { Circle, Heatmap, Polyline } from 'react-native-maps';
-import { LAYER } from '@/data/layer';
+import { LAYER, segCoords } from '@/data/layer';
 import { scoreColor } from '@/theme';
-import { toLatLngs } from '@/utils/geo';
 
 type Props = {
   segs: number[];
@@ -25,7 +24,7 @@ export const SafetyLayer = memo(function SafetyLayer({ segs, cross, heat, night,
         return (
           <Polyline
             key={`s${i}`}
-            coordinates={toLatLngs(s.c)}
+            coordinates={segCoords(i)}
             strokeColor={scoreColor(v) + (zoomedOut ? 'CC' : 'B3')}
             strokeWidth={SEG_WIDTH[s.k] ?? 3}
             lineCap="round"
@@ -38,7 +37,7 @@ export const SafetyLayer = memo(function SafetyLayer({ segs, cross, heat, night,
           points={heat}
           radius={40}
           opacity={0.75}
-          gradient={{ colors: ['#EAA300', '#FF6203', '#E5383B'], startPoints: [0.1, 0.5, 0.9], colorMapSize: 256 }}
+          gradient={{ colors: ['#F2A900', '#F57A2E', '#F0435A'], startPoints: [0.1, 0.5, 0.9], colorMapSize: 256 }}
         />
       ) : null}
       {cross.map((i) => {

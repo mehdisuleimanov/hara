@@ -12,7 +12,8 @@ import { ROUTES } from '@/data/routes';
 import { geminiJson } from '@/ai/gemini';
 import { AhmedAvatar } from '@/components/Brand';
 import { Orb } from '@/components/Orb';
-import { Icon, PillButton, Tag, Txt, tap } from '@/components/ui';
+import { Burst, FadeIn, Pop } from '@/components/anim';
+import { Icon, PillButton, Tag, Txt, tap, Heading } from '@/components/ui';
 import { TAB_BAR_SPACE } from '@/components/TabBar';
 import { C, R, shadow } from '@/theme';
 
@@ -108,9 +109,7 @@ export default function Report() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 18, paddingBottom: TAB_BAR_SPACE + 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <View style={{ flex: 1 }}>
-            <Txt w="black" size={40} lh={44}>
-              Nə{'\n'}görürsən?
-            </Txt>
+            <Heading light="Nə" bold="görürsən?" size={40} newline />
             <Txt w="med" size={15} color={C.muted} style={{ marginTop: 8 }}>
               Bir toxunuşla bildir, başqalarını qoru
             </Txt>
@@ -119,12 +118,12 @@ export default function Report() {
         </View>
 
         <View style={styles.grid}>
-          {CATS.map((c) => {
+          {CATS.map((c, i) => {
             const m = REPORT_META[c];
             const tone = m.tone === 'danger' ? C.danger : C.warn;
             return (
+              <FadeIn key={c} index={i} style={{ width: '31.5%', flexGrow: 1 }}>
               <Pressable
-                key={c}
                 onPress={() => {
                   tap(Haptics.ImpactFeedbackStyle.Medium);
                   submit(c);
@@ -138,6 +137,7 @@ export default function Report() {
                   {m.title}
                 </Txt>
               </Pressable>
+              </FadeIn>
             );
           })}
         </View>
@@ -153,10 +153,10 @@ export default function Report() {
         <View style={styles.voiceRow}>
           <AhmedAvatar size={52} mood={listening ? 'talk' : 'smile'} />
           <Pressable onPress={listening ? stopVoice : startVoice} style={[styles.mic, listening && { backgroundColor: C.black }]}>
-            <Icon name={listening ? 'stop' : 'microphone'} size={30} color="#fff" />
+            <Icon name={listening ? 'stop' : 'microphone'} size={30} color={listening ? C.brand : C.navy} />
           </Pressable>
           <View style={styles.bubble}>
-            <Txt w="semi" size={15} color={listening ? C.brand : C.ink}>
+            <Txt w="semi" size={15} color={listening ? C.ink : C.ink}>
               {listening ? `Dinləyirəm… ${Math.floor((rec.durationMillis ?? 0) / 1000)}s` : '“Bu keçiddə işıq yanmır”'}
             </Txt>
           </View>
@@ -186,8 +186,13 @@ export default function Report() {
               </>
             ) : flow ? (
               <>
-                <View style={styles.okIcon}>
-                  <Icon name="check-bold" size={42} color="#fff" />
+                <View style={{ width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
+                  <Burst size={240} />
+                  <Pop>
+                    <View style={styles.okIcon}>
+                      <Icon name="check-bold" size={42} color={C.ink} />
+                    </View>
+                  </Pop>
                 </View>
                 <Txt w="black" size={26} style={{ marginTop: 14 }}>
                   +10 xal
@@ -228,8 +233,6 @@ export default function Report() {
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 22 },
   cat: {
-    width: '31.5%',
-    flexGrow: 1,
     backgroundColor: C.surface,
     borderRadius: R.lg,
     paddingVertical: 18,

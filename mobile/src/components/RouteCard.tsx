@@ -23,7 +23,7 @@ const MODE_BG: Record<string, string> = {
   bike: C.brandSoft,
 };
 
-export function RouteCard({
+export const RouteCard = React.memo(function RouteCard({
   option,
   night,
   selected,
@@ -48,7 +48,7 @@ export function RouteCard({
     >
       <View style={{ flex: 1, gap: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {recommended ? <Tag label="TÖVSİYƏ" bg={C.brand} color="#fff" style={{ height: 24 }} /> : null}
+          {recommended ? <Tag label="TÖVSİYƏ" bg={C.brand} color={C.navy} style={{ height: 24 }} /> : null}
           <Txt w="xbold" size={19}>
             {KIND_TITLE[option.kind]}
           </Txt>
@@ -70,9 +70,12 @@ export function RouteCard({
           <Txt w="xbold" size={17}>
             {option.durationMin} dəq · {option.price}
           </Txt>
-          <Txt w="semi" size={13} color={option.co2g === 0 ? C.safe : C.muted}>
-            {option.co2g === 0 ? '🌿 0 CO₂' : `${option.co2g} q CO₂`}
-          </Txt>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Icon name="leaf" size={14} color={option.co2g === 0 ? C.safe : C.muted} />
+            <Txt w="semi" size={13} color={option.co2g === 0 ? C.safe : C.muted}>
+              {option.co2g === 0 ? '0 CO₂' : `${option.co2g} q CO₂`}
+            </Txt>
+          </View>
         </View>
         {option.warning ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -93,7 +96,7 @@ export function RouteCard({
       <ScoreRing score={s} size={70} />
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-/** Dotted gradient sphere (voice-chat reference), in brand orange tones. */
+/** Dotted gradient sphere (voice-chat reference), in mint → navy tones. */
 
 const STOPS = [
-  [255, 196, 107], // warm amber (top-left)
-  [255, 98, 3], // brand #FF6203
-  [255, 61, 113], // pink-red (bottom-right)
+  [127, 224, 176], // light green (top-left)
+  [18, 183, 106], // green #12B76A
+  [31, 111, 235], // blue #1F6FEB (bottom-right)
 ];
 
 function mix(t: number) {
@@ -42,7 +42,7 @@ function buildDots(n: number) {
 }
 
 export function Orb({ size = 240, level = 0, active = true }: { size?: number; level?: number; active?: boolean }) {
-  const dots = useMemo(() => buildDots(520), []);
+  const dots = useMemo(() => buildDots(380), []); // PERF: fewer SVG nodes
   const spin = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1)).current;
   const breathe = useRef(new Animated.Value(0)).current;
@@ -86,7 +86,7 @@ export function Orb({ size = 240, level = 0, active = true }: { size?: number; l
           width: size * 0.9,
           height: size * 0.9,
           borderRadius: size,
-          backgroundColor: 'rgba(255,98,3,0.10)',
+          backgroundColor: 'rgba(18,183,106,0.22)',
           transform: [{ scale: Animated.multiply(scale, breatheScale) }],
         }}
       />

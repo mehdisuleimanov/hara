@@ -1,85 +1,99 @@
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, LayoutChangeEvent, Pressable, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import { C, R, shadow } from '@/theme';
-import { Icon, Txt, tap } from './ui';
+import { C, shadow } from '@/theme';
+import { Icon, tap } from './ui';
 
 const META: Record<string, { icon: string; label: string }> = {
-  index: { icon: 'walk', label: 'Yol' },
-  map: { icon: 'map-outline', label: 'Xəritə' },
-  report: { icon: 'plus', label: 'Bildir' },
-  profile: { icon: 'account-outline', label: 'Profil' },
+  index: { icon: 'magnify', label: 'Yol tap' },
+  map: { icon: 'layers-outline', label: 'Təhlükəsizlik xəritəsi' },
+  report: { icon: 'plus-box-outline', label: 'Bildir' },
+  profile: { icon: 'account-circle-outline', label: 'Profil' },
 };
 
-/** Floating white pill tab bar; active tab = black pill, "Bildir" = orange disc. */
+const PAD = 10;
+const ITEM = 58;
+
+/** Glass icon bar; the active white square springs between tabs (native driver). */
 export function TabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const [w, setW] = useState(0);
+  const x = useRef(new Animated.Value(0)).current;
+  const n = state.routes.length;
+  const slot = w ? (w - PAD * 2) / n : 0;
+  const placed = useRef(false);
+
+  useEffect(() => {
+    if (!slot) return;
+    const target = PAD + slot * (state.index + 0.5) - ITEM / 2;
+    if (!placed.current) {
+      placed.current = true; // first layout: jump, don't slide from 0
+      x.setValue(target);
+      return;
+    }
+    Animated.spring(x, { toValue: target, speed: 16, bounciness: 9, useNativeDriver: true }).start();
+  }, [state.index, slot, x]);
+
   return (
-    <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
-      <View style={styles.bar}>
-        {state.routes.map((route, i) => {
-          const focused = state.index === i;
-          const meta = META[route.name] ?? { icon: 'circle', label: route.name };
-          const onPress = () => {
-            tap();
-            const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigateToTab(route.key);
-          };
-          if (route.name === 'report') {
-            return (
-              <Pressable key={route.key} onPress={onPress} style={styles.reportBtn}>
-                <Icon name="plus" size={30} color="#fff" />
-              </Pressable>
-            );
-          }
-          return (
-            <Pressable key={route.key} onPress={onPress} style={[styles.item, focused && styles.itemActive]}>
-              <Icon name={meta.icon} size={23} color={focused ? '#fff' : C.ink2} />
-              {focused ? (
-                <Txt w="semi" size={14} color="#fff">
-                  {meta.label}
-                </Txt>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
+    <BlurView
+      intensity={55}
+      tint="light"
+      onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+      style={[styles.bar, { bottom: Math.max(insets.bottom, 12) }]}
+    >
+      {slot ? <Animated.View style={[styles.indicator, { transform: [{ translateX: x }] }]} /> : null}
+      {state.routes.map((route, i) => {
+        const focused = state.index === i;
+        const meta = META[route.name] ?? { icon: 'circle-outline', label: route.name };
+        const onPress = () => {
+          tap();
+          const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigateToTab(route.key);
+        };
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="tab"
+            accessibilityLabel={meta.label}
+            accessibilityState={{ selected: focused }}
+            onPress={onPress}
+            style={styles.item}
+          >
+            <Icon name={meta.icon} size={27} color={focused ? '#FFFFFF' : C.ink} />
+          </Pressable>
+        );
+      })}
+    </BlurView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   bar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    height: 76,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.95)',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: C.surface,
-    borderRadius: R.pill,
-    padding: 7,
-    ...shadow(3),
+    paddingHorizontal: PAD,
+    ...shadow(2),
   },
-  item: {
-    height: 54,
-    minWidth: 54,
-    borderRadius: R.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
+  indicator: {
+    position: 'absolute',
+    left: 0,
+    top: (76 - ITEM) / 2,
+    width: ITEM,
+    height: ITEM,
+    borderRadius: 18,
+    backgroundColor: C.route,
+    ...shadow(1),
   },
-  itemActive: { backgroundColor: C.black, paddingHorizontal: 20 },
-  reportBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: C.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 2,
-  },
+  item: { flex: 1, height: ITEM, alignItems: 'center', justifyContent: 'center' },
 });
 
-export const TAB_BAR_SPACE = 110;
+export const TAB_BAR_SPACE = 104;

@@ -8,7 +8,7 @@ import { useNavStore } from '@/store/nav';
 import { optionOf } from '@/data/routes';
 import { LogoMark } from '@/components/Brand';
 import { Icon, Txt } from '@/components/ui';
-import { MAP_STYLE } from '@/components/mapStyle';
+import { MAP_STYLE_FOR_TYPE, MAP_TYPE } from '@/components/mapStyle';
 import { fmtDist, makeTrack, pointAt, toLatLngs } from '@/utils/geo';
 import { C, R, shadow } from '@/theme';
 
@@ -44,13 +44,13 @@ export default function WidgetPreview() {
 
   return (
     <Pressable style={{ flex: 1 }} onPress={() => router.back()}>
-      <LinearGradient colors={['#2B2B33', '#4A3328', '#FF6203']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#EAF2FF', '#F4F7FB', '#E6F7EE']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
       <View style={{ flex: 1, paddingTop: insets.top + 30, alignItems: 'center', paddingHorizontal: 18 }}>
-        <Icon name="lock-outline" size={22} color="rgba(255,255,255,0.85)" />
-        <Txt w="semi" size={16} color="rgba(255,255,255,0.85)" style={{ marginTop: 10 }}>
+        <Icon name="lock-outline" size={22} color={C.muted} />
+        <Txt w="semi" size={16} color={C.muted} style={{ marginTop: 10 }}>
           {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
         </Txt>
-        <Txt w="semi" size={92} color="#fff" style={{ letterSpacing: -2, lineHeight: 100 }}>
+        <Txt w="semi" size={92} color={C.ink} style={{ letterSpacing: -2, lineHeight: 100 }}>
           {hh}:{mm}
         </Txt>
 
@@ -86,7 +86,7 @@ export default function WidgetPreview() {
                 <MapView
                   provider={PROVIDER_GOOGLE}
                   style={StyleSheet.absoluteFill}
-                  customMapStyle={MAP_STYLE}
+                  mapType={MAP_TYPE} customMapStyle={MAP_STYLE_FOR_TYPE}
                   liteMode
                   region={{
                     latitude: pos?.latitude ?? route[0].latitude,
@@ -96,12 +96,12 @@ export default function WidgetPreview() {
                   }}
                   pointerEvents="none"
                 >
-                  <Polyline coordinates={route} strokeColor="rgba(255,98,3,0.25)" strokeWidth={14} />
-                  <Polyline coordinates={route} strokeColor={C.brand} strokeWidth={6} />
+                  <Polyline coordinates={route} strokeColor={C.halo} strokeWidth={14} />
+                  <Polyline coordinates={route} strokeColor={C.route} strokeWidth={6} />
                   {pos ? (
                     <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
                       <View style={styles.arrow}>
-                        <Icon name="navigation" size={18} color="#fff" />
+                        <Icon name="navigation" size={18} color="#FFFFFF" />
                       </View>
                     </Marker>
                   ) : null}
@@ -118,7 +118,7 @@ export default function WidgetPreview() {
             </View>
             <Txt w="med" size={14} color={C.muted} style={{ marginTop: 4 }}>
               {snap.hazard
-                ? `⚠ ${snap.hazard} · Əhməd yönləndirir`
+                ? `Diqqət: ${snap.hazard} · Əhməd yönləndirir`
                 : `Ən az riskli yol · ${snap.score} bal · ${snap.remainingMin} dəq · çatış ${snap.eta}`}
             </Txt>
           </View>
@@ -128,20 +128,20 @@ export default function WidgetPreview() {
         <View style={styles.notif}>
           <LogoMark size={18} />
           <View style={{ flex: 1 }}>
-            <Txt w="bold" size={13.5} color="#fff" numberOfLines={1}>
+            <Txt w="bold" size={13.5} color={C.ink} numberOfLines={1}>
               Hara? · {fmtDist(snap.distToNext)} {snap.maneuver} · {snap.street}
             </Txt>
-            <Txt w="med" size={12.5} color="rgba(255,255,255,0.75)" numberOfLines={1}>
+            <Txt w="med" size={12.5} color={C.muted} numberOfLines={1}>
               {snap.remainingMin} dəq · {fmtDist(snap.remainingM)} · Təhlükəsizlik {snap.score}
             </Txt>
           </View>
-          <Txt w="med" size={11.5} color="rgba(255,255,255,0.6)">
+          <Txt w="med" size={11.5} color={C.muted}>
             indi
           </Txt>
         </View>
 
         <View style={{ flex: 1 }} />
-        <Txt w="med" size={12} color="rgba(255,255,255,0.7)" center style={{ marginBottom: insets.bottom + 16 }}>
+        <Txt w="med" size={12} color={C.muted} center style={{ marginBottom: insets.bottom + 16 }}>
           {snap.active ? 'Canlı · naviqasiya davam edir' : 'Nümunə · naviqasiyanı başladanda canlı olur'}
           {'\n'}Kilid ekranı simulyasiyası · bağlamaq üçün toxun
         </Txt>
@@ -151,21 +151,21 @@ export default function WidgetPreview() {
 }
 
 const styles = StyleSheet.create({
-  widget: { width: '100%', backgroundColor: '#fff', borderRadius: R.card, overflow: 'hidden', marginTop: 26 },
+  widget: { width: '100%', backgroundColor: C.surface, borderRadius: R.card, overflow: 'hidden', marginTop: 26 },
   timeline: { width: '46%', paddingVertical: 18, paddingLeft: 16, paddingRight: 6, justifyContent: 'space-between' },
   tlItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 16, height: 16, borderRadius: 8, backgroundColor: C.brand, borderWidth: 4, borderColor: C.brandSoft },
-  ring: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,98,3,0.18)', alignItems: 'center', justifyContent: 'center', marginLeft: -3 },
-  ringInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#fff' },
-  dash: { width: 2, flex: 1, marginLeft: 7, marginVertical: 4, borderLeftWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(255,98,3,0.45)' },
+  ring: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(18,183,106,0.5)', alignItems: 'center', justifyContent: 'center', marginLeft: -3 },
+  ringInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: C.surface },
+  dash: { width: 2, flex: 1, marginLeft: 7, marginVertical: 4, borderLeftWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(15,27,45,0.22)' },
   map: { flex: 1, backgroundColor: C.bg, borderBottomLeftRadius: 0 },
-  arrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.brand, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  arrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.route, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   notif: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.85)',
     borderRadius: 22,
     padding: 14,
     marginTop: 12,

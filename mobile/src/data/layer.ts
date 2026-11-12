@@ -1,4 +1,4 @@
-import raw from './safety-layer.json';
+import type { LatLng } from './types';
 
 /** [lat, lon, type, scoreDay, scoreNight, lanes]; type: 0 signals, 1 zebra, 2 unmarked, 3 underground */
 export type CrossingT = [number, number, number, number, number, number];
@@ -6,7 +6,40 @@ export type CrossingT = [number, number, number, number, number, number];
 export type SegmentT = { k: number; d: number; n: number; c: number[] };
 
 type Layer = { crossings: CrossingT[]; segments: SegmentT[]; stations: { name: string; lat: number; lon: number }[] };
-export const LAYER = raw as unknown as Layer;
+
+/**
+ * PERF: the 1.6 MB layer is parsed lazily on first access (not at app start).
+ * Metro evaluates a JSON module only when it is first required.
+ */
+let _layer: Layer | null = null;
+function load(): Layer {
+  if (!_layer) _layer = require('./safety-layer.json') as Layer;
+  return _layer;
+}
+export const LAYER = {
+  get crossings() {
+    return load().crossings;
+  },
+  get segments() {
+    return load().segments;
+  },
+  get stations() {
+    return load().stations;
+  },
+};
+
+/** PERF: cache LatLng arrays per segment so re-renders don't rebuild them. */
+const segCoordCache = new Map<number, LatLng[]>();
+export function segCoords(i: number): LatLng[] {
+  let v = segCoordCache.get(i);
+  if (!v) {
+    const c = LAYER.segments[i].c;
+    v = [];
+    for (let j = 0; j < c.length; j += 2) v.push({ latitude: c[j], longitude: c[j + 1] });
+    segCoordCache.set(i, v);
+  }
+  return v;
+}
 
 export const CROSSING_TYPE = ['İşıqforlu keçid', 'İşıqforsuz zebra', 'Nişansız keçid', 'Yeraltı keçid'];
 
@@ -71,7 +104,7 @@ export function visible(r: Region, night: boolean, opts: { maxSeg?: number; maxC
   if (zoomedOut) segs = segs.filter((i) => LAYER.segments[i].k <= 1);
   // major roads first, then the riskiest
   segs.sort((a, b) => LAYER.segments[a].k - LAYER.segments[b].k || sc(a) - sc(b));
-  segs = segs.slice(0, opts.maxSeg ?? (zoomedOut ? 380 : 420));
+  segs = segs.slice(0, opts.maxSeg ?? (zoomedOut ? 220 : 260)); // PERF: fewer native overlays
 
   const cs = (i: number) => (night ? LAYER.crossings[i][4] : LAYER.crossings[i][3]);
   let cross: number[] = [];
@@ -82,7 +115,7 @@ export function visible(r: Region, night: boolean, opts: { maxSeg?: number; maxC
       .map((i) => ({ latitude: LAYER.crossings[i][0], longitude: LAYER.crossings[i][1], weight: (60 - cs(i)) / 60 }));
   } else {
     crs.sort((a, b) => cs(a) - cs(b));
-    cross = crs.slice(0, opts.maxCross ?? 320);
+    cross = crs.slice(0, opts.maxCross ?? 220);
   }
   let safe = 0, mid = 0, risky = 0;
   for (const i of crs) {

@@ -7,11 +7,11 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '@/store/useAppStore';
 import { ROUTES } from '@/data/routes';
-import { MAP_STYLE } from '@/components/mapStyle';
+import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
 import { IconPin } from '@/components/RouteLines';
 import { AhmedAvatar, Avatar } from '@/components/Brand';
 import { ScoreRing } from '@/components/ScoreRing';
-import { CircleButton, Icon, PillButton, Tag, Txt } from '@/components/ui';
+import { CircleButton, Heading, Icon, PillButton, Tag, Txt } from '@/components/ui';
 import { makeTrack, pointAt, regionFor, toLatLngs } from '@/utils/geo';
 import { triggerFamilyArrival } from '@/utils/notify';
 import { C, R, shadow } from '@/theme';
@@ -38,19 +38,17 @@ function Paywall() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <LinearGradient colors={[C.brand, '#FF8A3D']} style={[styles.hero, { paddingTop: insets.top + 8 }]}>
+        <LinearGradient colors={[C.purple, '#D6E6FF']} style={[styles.hero, { paddingTop: insets.top + 8 }]}>
           <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 18 }}>
             <View style={{ flex: 1 }}>
-              <Tag label="PREMIUM" bg="rgba(255,255,255,0.25)" color="#fff" />
-              <Txt w="black" size={40} lh={44} color="#fff" style={{ marginTop: 10 }}>
-                Hara Ailə
-              </Txt>
-              <Txt w="semi" size={16} color="rgba(255,255,255,0.9)" style={{ marginTop: 6 }}>
+              <Tag label="PREMIUM" bg="rgba(255,255,255,0.25)" color={C.ink} />
+              <Heading light="Hara" bold="Ailə" size={40} color={C.ink} style={{ marginTop: 10 }} />
+              <Txt w="semi" size={16} color={C.muted} style={{ marginTop: 6 }}>
                 Sevdiklərinin yolu da{'\n'}ən az riskli olsun
               </Txt>
             </View>
-            <AhmedAvatar size={92} />
+            <AhmedAvatar size={100} full />
           </View>
         </LinearGradient>
 
@@ -68,14 +66,14 @@ function Paywall() {
                 5 ailə üzvünə qədər · 7 gün pulsuz
               </Txt>
             </View>
-            <Tag label="Ucuz və əlçatan" bg={C.brandSoft} color={C.brand} />
+            <Tag label="Ucuz və əlçatan" bg={C.brand} color={C.navy} />
           </View>
 
           <View style={{ gap: 10, marginTop: 14 }}>
             {FEATURES.map((f) => (
               <View key={f.t} style={styles.feature}>
                 <View style={styles.fIcon}>
-                  <Icon name={f.icon} size={24} color={C.brand} />
+                  <Icon name={f.icon} size={24} color={C.navy} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Txt w="bold" size={16}>
@@ -120,6 +118,7 @@ function Dashboard() {
   const nene = useMemo(() => makeTrack(toLatLngs(f.nene.c)), [f]);
   const murad = useMemo(() => toLatLngs(f.murad.c), [f]);
   const region = useMemo(() => regionFor([...nene.pts, ...murad], 1.5), [nene, murad]);
+  const sat = useSatelliteType(region.latitudeDelta);
   const [progress, setProgress] = useState(0.18);
   const [arrived, setArrived] = useState(false);
   const [shareNight, setShareNight] = useState(true);
@@ -151,13 +150,39 @@ function Dashboard() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 18, paddingBottom: 40 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <CircleButton icon="chevron-left" size={52} onPress={() => router.back()} />
-          <Txt w="black" size={32} style={{ flex: 1 }}>
-            Ailə
-          </Txt>
-          <Tag label="Hara Ailə" icon="crown-outline" bg={C.brandSoft} color={C.brand} style={{ height: 36, paddingHorizontal: 14 }} />
+          <Heading light="Hara" bold="Ailə" size={32} style={{ flex: 1 }} />
+          <Tag label="Premium" icon="crown-outline" bg={C.brand} color={C.navy} style={{ height: 36, paddingHorizontal: 14 }} />
         </View>
 
-        <View style={[styles.member, { marginTop: 18 }]}>
+        {/* reference "Connecting…" visual */}
+        <View style={styles.connect}>
+          <Txt w="semi" size={17} center>
+            {arrived ? 'Nənə evə çatdı ✓' : 'Bağlantı aktivdir…'}
+          </Txt>
+          <View style={styles.connectStage}>
+            <View style={styles.orbit} />
+            <View style={styles.orbitIcon}>
+              <Icon name={arrived ? 'home-heart' : 'walk'} size={24} color={C.navy} />
+            </View>
+            <View style={[styles.bigCircle, { backgroundColor: C.brand, left: 22, top: 0 }]}>
+              <Avatar size={74} initials="A" />
+              <Txt w="semi" size={14} color="#FFFFFF" style={{ marginTop: 6 }}>
+                Sən
+              </Txt>
+            </View>
+            <View style={[styles.bigCircle, { backgroundColor: C.route, right: 22, top: 86 }]}>
+              <Avatar size={74} initials="N" />
+              <Txt w="semi" size={14} color="#FFFFFF" style={{ marginTop: 6 }}>
+                Nənə
+              </Txt>
+            </View>
+            <View style={styles.linkPill}>
+              <Icon name="link-variant" size={26} color={C.brand} />
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.member, { marginTop: 12 }]}>
           <Avatar size={64} initials="M" />
           <View style={{ flex: 1 }}>
             <Txt w="xbold" size={19}>
@@ -176,7 +201,7 @@ function Dashboard() {
             <Tag
               label={arrived ? 'Evə çatdı ✓' : `Səfərdədir · ${remaining} dəq qalıb`}
               bg={arrived ? C.safeSoft : C.brandSoft}
-              color={arrived ? C.safe : C.brand}
+              color={arrived ? C.safe : C.navy}
               style={{ marginTop: 6 }}
             />
           </View>
@@ -184,15 +209,15 @@ function Dashboard() {
         </View>
 
         <View style={styles.mapWrap}>
-          <MapView provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} customMapStyle={MAP_STYLE} initialRegion={region} toolbarEnabled={false}>
+          <MapView provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} mapType={sat.mapType} onRegionChangeComplete={sat.onRegionChangeComplete} customMapStyle={MAP_STYLE_FOR_TYPE} initialRegion={region} toolbarEnabled={false}>
             <Polyline coordinates={murad} strokeColor={C.safe} strokeWidth={6} lineCap="round" />
-            <Polyline coordinates={nene.pts} strokeColor="rgba(255,98,3,0.25)" strokeWidth={14} lineCap="round" />
-            <Polyline coordinates={nene.pts} strokeColor={C.brand} strokeWidth={6} lineCap="round" />
-            <IconPin latitude={f.home.lat} longitude={f.home.lon} icon="home-outline" bg={C.black} color="#fff" />
-            <IconPin latitude={f.school.lat} longitude={f.school.lon} icon="school-outline" bg={C.safe} color="#fff" />
+            <Polyline coordinates={nene.pts} strokeColor={C.halo} strokeWidth={14} lineCap="round" />
+            <Polyline coordinates={nene.pts} strokeColor={C.route} strokeWidth={6} lineCap="round" />
+            <IconPin latitude={f.home.lat} longitude={f.home.lon} icon="home-outline" bg={C.black} color={C.ink} />
+            <IconPin latitude={f.school.lat} longitude={f.school.lon} icon="school-outline" bg={C.safe} color={C.ink} />
             <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={30}>
               <View style={styles.neneDot}>
-                <Txt w="xbold" size={14} color="#fff">
+                <Txt w="xbold" size={14} color={C.navy}>
                   N
                 </Txt>
               </View>
@@ -239,7 +264,7 @@ function Dashboard() {
         <View style={styles.backdrop}>
           <View style={styles.modal}>
             <View style={[styles.okIcon, { backgroundColor: C.danger }]}>
-              <Icon name="shield-alert" size={40} color="#fff" />
+              <Icon name="shield-alert" size={40} color={C.ink} />
             </View>
             <Txt w="black" size={24} center style={{ marginTop: 14 }}>
               SOS göndərildi
@@ -260,12 +285,42 @@ function Dashboard() {
 
 const styles = StyleSheet.create({
   hero: { paddingHorizontal: 18, paddingBottom: 48, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
-  priceCard: { backgroundColor: '#fff', borderRadius: R.card, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  priceCard: { backgroundColor: C.surface, borderRadius: R.card, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   feature: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.surface, borderRadius: R.lg, padding: 14 },
   fIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  connect: { backgroundColor: C.surface, borderRadius: R.card, paddingTop: 18, paddingBottom: 10, marginTop: 16, overflow: 'hidden' },
+  connectStage: { height: 250, marginTop: 6 },
+  orbit: {
+    position: 'absolute',
+    left: '50%',
+    top: 18,
+    width: 210,
+    height: 210,
+    marginLeft: -105,
+    borderRadius: 105,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#9AA1B2',
+  },
+  orbitIcon: { position: 'absolute', right: 44, top: 14, width: 44, height: 44, borderRadius: 22, backgroundColor: C.bg2, alignItems: 'center', justifyContent: 'center' },
+  bigCircle: { position: 'absolute', width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center' },
+  linkPill: {
+    position: 'absolute',
+    left: '50%',
+    top: 106,
+    marginLeft: -38,
+    width: 76,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: C.navy,
+    borderWidth: 3,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   member: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.surface, borderRadius: R.card, padding: 14, marginTop: 10 },
   mapWrap: { height: 230, borderRadius: R.card, overflow: 'hidden', marginTop: 12, backgroundColor: C.surface },
-  mapLabel: { position: 'absolute', left: 12, bottom: 12, backgroundColor: '#fff', borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 8 },
+  mapLabel: { position: 'absolute', left: 12, bottom: 12, backgroundColor: C.surface, borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 8 },
   neneDot: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.brand, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   toggles: { backgroundColor: C.surface, borderRadius: R.lg, paddingHorizontal: 16, marginTop: 12 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 58 },

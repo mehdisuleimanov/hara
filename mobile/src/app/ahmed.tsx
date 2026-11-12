@@ -18,6 +18,7 @@ import { useAppStore, isNightNow } from '@/store/useAppStore';
 import type { AhmedResult } from '@/store/useAppStore';
 import { Orb } from '@/components/Orb';
 import { Waveform } from '@/components/Waveform';
+import { Pulse } from '@/components/anim';
 import { AhmedAvatar } from '@/components/Brand';
 import { CircleButton, Icon, Txt, tap } from '@/components/ui';
 import { speak, stopSpeaking } from '@/utils/tts';
@@ -175,9 +176,9 @@ export default function Ahmed() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={['#FFF3EA', '#FFFFFF', '#FFF8F3']} style={StyleSheet.absoluteFill} />
-      <View style={[styles.blob, { top: 60, left: -80, backgroundColor: 'rgba(255,98,3,0.10)' }]} />
-      <View style={[styles.blob, { bottom: 140, right: -90, backgroundColor: 'rgba(255,61,113,0.08)' }]} />
+      <LinearGradient colors={['#EAF2FF', '#FFFFFF', '#E6F7EE']} style={StyleSheet.absoluteFill} />
+      <View style={[styles.blob, { top: 60, left: -80, backgroundColor: 'rgba(18,183,106,0.25)' }]} />
+      <View style={[styles.blob, { bottom: 140, right: -90, backgroundColor: 'rgba(15,27,45,0.05)' }]} />
 
       <View style={{ flex: 1, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 16) }}>
         {/* header */}
@@ -195,7 +196,7 @@ export default function Ahmed() {
         </View>
 
         <ScrollView contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
-          <Txt w="semi" size={15} color={phase === 'listening' ? C.brand : C.muted} style={{ marginTop: 18 }}>
+          <Txt w="semi" size={15} color={phase === 'listening' ? C.ink : C.muted} style={{ marginTop: 18 }}>
             {status}
           </Txt>
 
@@ -228,7 +229,7 @@ export default function Ahmed() {
 
           {answer && phase === 'answer' ? (
             <View style={styles.replyCard}>
-              <Icon name="creation" size={18} color={C.brand} />
+              <Icon name="creation" size={18} color={C.navy} />
               <Txt w="med" size={14.5} color={C.ink2} lh={20} style={{ flex: 1 }}>
                 {answer.reply}
               </Txt>
@@ -265,7 +266,7 @@ export default function Ahmed() {
               icon="arrow-up"
               size={52}
               bg={C.brand}
-              color="#fff"
+              color={C.navy}
               onPress={() => input.trim() && run({ text: input.trim() })}
             />
           </View>
@@ -276,9 +277,12 @@ export default function Ahmed() {
               onPress={() => (phase === 'listening' ? stopAndSend() : phase === 'thinking' ? null : startListening())}
               style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.95 : 1 }] }]}
             >
-              <LinearGradient colors={['#FF8A3D', C.brand, '#F0336A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.mic}>
-                <Icon name={phase === 'listening' ? 'stop' : 'microphone'} size={34} color="#fff" />
+              <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {phase === 'listening' ? <Pulse size={84} color={C.brand} duration={1300} /> : null}
+              <LinearGradient colors={['#7FE0B0', C.brand, '#1F6FEB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.mic}>
+                <Icon name={phase === 'listening' ? 'stop' : 'microphone'} size={34} color={C.navy} />
               </LinearGradient>
+              </View>
             </Pressable>
             <View style={styles.controls}>
               <CircleButton icon="close" size={54} onPress={cancel} style={shadow(1)} />
@@ -304,7 +308,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow(2),
@@ -312,14 +316,14 @@ const styles = StyleSheet.create({
   replyCard: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     borderRadius: R.md,
     padding: 14,
     marginTop: 4,
     ...shadow(1),
   },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 },
-  suggestion: { backgroundColor: '#fff', borderRadius: R.pill, paddingHorizontal: 14, height: 38, justifyContent: 'center', ...shadow(1) },
+  suggestion: { backgroundColor: C.surface, borderRadius: R.pill, paddingHorizontal: 14, height: 38, justifyContent: 'center', ...shadow(1) },
   mic: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', ...shadow(3) },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 24 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
@@ -327,7 +331,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     borderRadius: R.pill,
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     paddingHorizontal: 20,
     fontFamily: F.med,
     fontSize: 16,
