@@ -455,7 +455,7 @@ export default function AhmedScreen() {
               </Animated.View>
               <Animated.View entering={enter(2, 'up')}>
                 <Txt v="body" center color={C.muted} style={{ marginTop: 8, maxWidth: 300 }}>
-                  {hint ?? 'Səslə de və ya yaz. Mən ən az riskli yolu tapım.'}
+                  {hint ?? 'Səslə de və ya yaz,\nən az riskli yolu mən tapım.'}
                 </Txt>
               </Animated.View>
               {!textMode || !t.simple ? (

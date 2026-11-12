@@ -66,7 +66,8 @@ const UNDERSTAND_SCHEMA = {
 function understandPrompt(night: boolean) {
   const catalog = DESTINATIONS.map((d) => `- ${d.id}: ${d.name} (${d.district}; also: ${d.aliases.join(', ')})`).join('\n');
   return `You are the speech-understanding stage of "Əhməd", the voice companion of "Hara?" — a Baku app that recommends the LEAST RISKY way to walk, ride or travel.
-The user speaks Azerbaijani (sometimes mixed with Russian, Turkish or English). Input is audio or text.
+The user speaks Azerbaijani (sometimes mixed with Russian, Turkish or English). Their message is an audio recording or typed text.
+If the recording is silent, noise, a tone or has no intelligible speech, return intent "unclear" with an EMPTY transcript — never invent words.
 The user's location is ALWAYS 28 May metro station (the origin). It is now ${night ? 'NIGHT' : 'DAY'} in Baku.
 
 Return JSON:
@@ -74,7 +75,7 @@ Return JSON:
 - intent: "route" if they want to go somewhere / ask how to get somewhere; "question" for a free question about safety, streets, crossings, weather or the app; "unclear" if the audio is silent, noise or not understandable.
 - destinationId: the catalog id they want to go to (or ask about). "28 May" is the ORIGIN, never the destination. "other" if they name a place not in the catalog; "none" if no place.
 - placeQuery: the place or street name as said when destinationId is "other", or the street/area a question is about; otherwise "".
-- timeOfDay: "night" if they mention night/evening/dark (gecə, axşam, qaranlıq), "day" if day/morning, else "unspecified".
+- timeOfDay: "night" only if the USER mentions night/evening/dark (gecə, axşam, qaranlıq), "day" only if they mention day/morning; otherwise "unspecified" (do not infer it from the current time).
 - profile: "accessible" for wheelchair, stroller (uşaq arabası), elderly with mobility issues, blind or deaf users; "scooter" for scooter or bicycle; "family" if they talk about tracking a child or family member; otherwise "daily".
 - preference: "cheapest" if they want cheap (ucuz, sərfəli, qənaət); "fastest" if in a hurry (tez, sürətli, tələsirəm); otherwise "safest".
 - companions: any of stroller, wheelchair, child, elderly.
@@ -286,7 +287,7 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
     try {
       const ctx = opts.history?.length ? `Previous turns (for follow-ups):\n${opts.history.map((h) => `user: ${h.q}\nəhməd: ${h.a}`).join('\n')}\n\n` : '';
       const parts: Part[] = isAudio
-        ? [{ inlineData: { mimeType: input.mime ?? 'audio/mp4', data: input.audioB64! } }, { text: `${ctx}Bu səsli sorğunu emal et.` }]
+        ? [...(ctx ? [{ text: ctx }] : []), { inlineData: { mimeType: input.mime ?? 'audio/mp4', data: input.audioB64! } }]
         : [{ text: `${ctx}${input.text ?? ''}` }];
       u = await hedged(
         (ms) => geminiJson<Understood>({ system: understandPrompt(opts.night), parts, schema: UNDERSTAND_SCHEMA, timeoutMs: ms, temperature: 0.1 }),
@@ -323,8 +324,12 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
     };
   }
 
-  const transcript = (u.transcript || input.text || '').trim();
-  opts.onTranscript?.(transcript);
+  let transcript = (u.transcript || input.text || '').trim();
+  // a model echoing instructions / producing no words is not a transcript
+  if (isAudio && (/emal et|sorğunu|transcri|recording/i.test(transcript) || norm(transcript).replace(/[^a-z]/g, '').length < 2)) {
+    transcript = '';
+  }
+  if (transcript) opts.onTranscript?.(transcript);
   const destId = u.destinationId && destById(u.destinationId) ? u.destinationId : null;
   const place = (u.placeQuery || '').trim();
   const tod = toTod(u.timeOfDay);
@@ -339,11 +344,10 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
   emit({
     type: 'update',
     id: 'understand',
-    patch: {
-      label: voiceLike ? 'Səs anlaşıldı' : 'Sorğu anlaşıldı',
-      value: slotSummary({ destId, place, tod, companions, profile, preference, intent }),
-      state: intent === 'unclear' ? 'warn' : 'done',
-    },
+    patch:
+      intent === 'unclear'
+        ? { label: voiceLike ? 'Səsi aydın eşitmədim' : 'Dəqiq başa düşmədim', value: undefined, state: 'warn' }
+        : { label: voiceLike ? 'Səs anlaşıldı' : 'Sorğu anlaşıldı', value: slotSummary({ destId, place, tod, companions, profile, preference, intent }), state: 'done' },
   });
 
   const base = (p: Partial<AhmedResult> & Pick<AhmedResult, 'reply'>) => makeResult({ transcript, ...p }, error);

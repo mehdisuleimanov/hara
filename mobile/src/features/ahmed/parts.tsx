@@ -56,7 +56,7 @@ export function TalkingAvatar({ size, level, speaking }: { size: number; level: 
 /** Əhməd's answer: springs in, text writes itself while he speaks. */
 export function ReplyBubble({ text, level, speaking }: { text: string; level: SharedValue<number>; speaking: boolean }) {
   const t = useTheme();
-  const [shown] = useTypewriter(text, 70);
+  const [shown] = useTypewriter(text, 90);
   return (
     <Animated.View entering={enter(0, 'pop')} style={[styles.reply, t.hc && styles.hc]}>
       <View style={styles.replyAvatar}>

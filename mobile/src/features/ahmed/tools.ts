@@ -136,7 +136,7 @@ function optionJson(o: RouteOption, night: boolean): Json {
     kind: o.kind,
     summary: summary(o),
     legs,
-    total_minutes: o.durationMin,
+    door_to_door_minutes: o.durationMin,
     price: o.price,
     co2_g: o.co2g,
     safety_score: score(o, night),
