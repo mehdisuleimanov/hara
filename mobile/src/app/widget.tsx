@@ -1,26 +1,65 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useNavStore } from '@/store/nav';
 import { optionOf } from '@/data/routes';
 import { LogoMark } from '@/components/Brand';
+import { ScoreRing } from '@/components/ScoreRing';
 import { Icon, Txt } from '@/components/ui';
-import { MAP_STYLE_FOR_TYPE, MAP_TYPE } from '@/components/mapStyle';
+import { MAP_STYLE } from '@/components/mapStyle';
+import { enter } from '@/motion';
+import { useFx } from '@/hooks/useTheme';
 import { fmtDist, makeTrack, pointAt, toLatLngs } from '@/utils/geo';
-import { C, R, shadow } from '@/theme';
+import { C, F, R } from '@/theme';
 
 const DAYS = ['Bazar', 'Bazar ertəsi', 'Çərşənbə axşamı', 'Çərşənbə', 'Cümə axşamı', 'Cümə', 'Şənbə'];
 const MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avqust', 'sentyabr', 'oktyabr', 'noyabr', 'dekabr'];
 
+/** Faint city lines on the wallpaper (brand motif from the logo artwork). */
+function Wallpaper() {
+  return (
+    <>
+      <LinearGradient colors={['#0A1A3A', '#071532', '#06122A']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 860" preserveAspectRatio="xMidYMid slice">
+        <Path d="M-20 190 C 80 120 160 150 230 110 S 360 40 420 70" stroke="#1A4766" strokeWidth={2} fill="none" />
+        <Path d="M230 110 C 250 170 300 220 420 260" stroke="#1A4766" strokeWidth={2} fill="none" />
+        <Path d="M-30 640 C 90 600 170 640 260 590 S 380 520 430 540" stroke="#1A4766" strokeWidth={2} fill="none" />
+        <Path d="M120 860 C 130 760 170 700 260 590" stroke="#1A4766" strokeWidth={2} fill="none" />
+        <Path d="M300 30 l 40 20 l -20 40 l -40 -20 z M320 40 l 20 10 M330 20 l -20 40" stroke="#1A4766" strokeWidth={1.6} fill="none" />
+        <Path d="M30 740 l 40 20 l -20 40 l -40 -20 z M50 750 l -20 40 M40 770 l 40 20" stroke="#1A4766" strokeWidth={1.6} fill="none" />
+      </Svg>
+    </>
+  );
+}
+
+function LiveDot() {
+  const { lite } = useFx();
+  const v = useSharedValue(0);
+  useEffect(() => {
+    if (lite) return;
+    v.value = withRepeat(withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }), -1, false);
+  }, [lite, v]);
+  const ring = useAnimatedStyle(() => ({ opacity: 0.6 * (1 - v.value), transform: [{ scale: 1 + v.value * 1.6 }] }));
+  return (
+    <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[styles.liveRing, ring]} />
+      <View style={styles.liveCore} />
+    </View>
+  );
+}
+
 /**
- * Lock-screen widget SIMULATION (reference 2: "Smart Navigation").
- * Real home/lock-screen widgets need a native dev build; in Expo Go the live
- * part is the sticky notification (see utils/notify.ts).
+ * "Kilid ekranında belə görünür": the live trip card the app keeps on the lock screen
+ * (sticky notification on Android). Mirrors the running navigation, or the Hilton walk.
  */
-export default function WidgetPreview() {
+export default function LockScreenPreview() {
   const insets = useSafeAreaInsets();
   const snap = useNavStore((s) => s.snap);
   const [now, setNow] = useState(new Date());
@@ -29,7 +68,6 @@ export default function WidgetPreview() {
     return () => clearInterval(id);
   }, []);
 
-  // when no navigation is running, show the Hilton safest walk as a sample
   const sample = useMemo(() => {
     const o = optionOf('hilton', 'safest');
     const pts = o ? o.legs.filter((l) => l.mode === 'walk').flatMap((l) => toLatLngs(l.c)) : [];
@@ -38,55 +76,93 @@ export default function WidgetPreview() {
   }, []);
   const route = snap.active && snap.route.length ? snap.route : sample.pts;
   const pos = snap.active && snap.pos ? snap.pos : sample.pos;
+  const total = Math.max(1, snap.remainingM + 420);
+  const done = Math.min(0.96, Math.max(0.06, 1 - snap.remainingM / total));
+
+  const prog = useSharedValue(0);
+  useEffect(() => {
+    prog.value = withTiming(done, { duration: 900, easing: Easing.out(Easing.cubic) });
+  }, [done, prog]);
+  const fill = useAnimatedStyle(() => ({ width: `${prog.value * 100}%` }));
+  const walker = useAnimatedStyle(() => ({ left: `${prog.value * 100}%` }));
 
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
+  const hazard = !!snap.hazard;
 
   return (
-    <Pressable style={{ flex: 1 }} onPress={() => router.back()}>
-      <LinearGradient colors={['#EAF2FF', '#F4F7FB', '#E6F7EE']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
-      <View style={{ flex: 1, paddingTop: insets.top + 30, alignItems: 'center', paddingHorizontal: 18 }}>
-        <Icon name="lock-outline" size={22} color={C.muted} />
-        <Txt w="semi" size={16} color={C.muted} style={{ marginTop: 10 }}>
-          {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
-        </Txt>
-        <Txt w="semi" size={92} color={C.ink} style={{ letterSpacing: -2, lineHeight: 100 }}>
-          {hh}:{mm}
-        </Txt>
+    <Pressable
+      style={{ flex: 1 }}
+      accessibilityRole="button"
+      accessibilityLabel="Bağla"
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        router.back();
+      }}
+    >
+      <StatusBar style="light" />
+      <Wallpaper />
+      <View style={{ flex: 1, paddingTop: insets.top + 14, paddingHorizontal: 16, alignItems: 'center' }}>
+        <Animated.View entering={enter(0, 'down')} style={styles.caption}>
+          <Icon name="cellphone-lock" size={15} color="#CFE0FF" />
+          <Txt w="semi" size={12.5} color="#CFE0FF">
+            Kilid ekranında belə görünür
+          </Txt>
+        </Animated.View>
 
-        {/* widget card */}
-        <View style={[styles.widget, shadow(3)]}>
-          <View style={{ flexDirection: 'row', height: 190 }}>
-            <View style={styles.timeline}>
-              <View style={styles.tlItem}>
-                <View style={styles.dot} />
-                <Txt w="semi" size={13} color={C.ink2} numberOfLines={1} style={{ flex: 1 }}>
-                  {snap.destName}
-                </Txt>
-              </View>
-              <View style={styles.dash} />
-              <View style={styles.tlItem}>
-                <View style={styles.ring}>
-                  <View style={styles.ringInner} />
+        <Animated.View entering={enter(1, 'fade')} style={{ alignItems: 'center', marginTop: 18 }}>
+          <Icon name="lock-outline" size={20} color="rgba(255,255,255,0.8)" />
+          <Txt w="semi" size={15} color="rgba(255,255,255,0.85)" style={{ marginTop: 6 }}>
+            {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
+          </Txt>
+          <Txt size={86} color="#FFFFFF" style={{ fontFamily: F.semi, letterSpacing: -3, lineHeight: 96 }}>
+            {hh}:{mm}
+          </Txt>
+        </Animated.View>
+
+        {/* live trip card */}
+        <Animated.View entering={enter(2, 'up', 120)} style={styles.card}>
+          <View style={styles.cardHead}>
+            <LogoMark size={26} />
+            <Txt w="bold" size={13.5} color={C.ink2} style={{ flex: 1 }}>
+              Hara · {snap.destName}
+            </Txt>
+            <LiveDot />
+            <Txt w="bold" size={12.5} color={C.brandDark}>
+              {snap.active ? 'Canlı' : 'Yolda'}
+            </Txt>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+            <View style={{ flex: 1, gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[styles.turn, hazard && { backgroundColor: C.warn }]}>
+                  <Icon name={hazard ? 'alert' : snap.maneuverIcon || 'arrow-top-right-thick'} size={22} color="#FFFFFF" />
                 </View>
-                <Txt w="bold" size={14} numberOfLines={2} style={{ flex: 1 }}>
-                  {fmtDist(snap.distToNext)} {snap.maneuver}
-                </Txt>
+                <View style={{ flex: 1 }}>
+                  <Txt w="xbold" size={20} color={C.ink} numberOfLines={1}>
+                    {fmtDist(snap.distToNext)}
+                  </Txt>
+                  <Txt w="semi" size={13} color={C.ink2} numberOfLines={1}>
+                    {snap.maneuver} · {snap.street}
+                  </Txt>
+                </View>
               </View>
-              <View style={styles.dash} />
-              <View style={styles.tlItem}>
-                <View style={styles.dot} />
-                <Txt w="semi" size={13} color={C.ink2}>
-                  {snap.speedKmh} km/s
-                </Txt>
-              </View>
+              {hazard ? (
+                <View style={styles.hazard}>
+                  <Icon name="alert-circle" size={15} color="#92400E" />
+                  <Txt w="semi" size={12.5} color="#92400E" numberOfLines={2} style={{ flex: 1 }}>
+                    {snap.hazard} · Əhməd yönləndirir
+                  </Txt>
+                </View>
+              ) : null}
             </View>
             <View style={styles.map}>
               {route.length > 1 ? (
                 <MapView
-                  provider={PROVIDER_GOOGLE}
                   style={StyleSheet.absoluteFill}
-                  mapType={MAP_TYPE} customMapStyle={MAP_STYLE_FOR_TYPE}
+                  mapType="standard"
+                  customMapStyle={MAP_STYLE}
                   liteMode
                   region={{
                     latitude: pos?.latitude ?? route[0].latitude,
@@ -96,78 +172,81 @@ export default function WidgetPreview() {
                   }}
                   pointerEvents="none"
                 >
-                  <Polyline coordinates={route} strokeColor={C.halo} strokeWidth={14} />
-                  <Polyline coordinates={route} strokeColor={C.route} strokeWidth={6} />
+                  <Polyline coordinates={route} strokeColor={C.halo} strokeWidth={12} />
+                  <Polyline coordinates={route} strokeColor={C.route} strokeWidth={5} />
                   {pos ? (
                     <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-                      <View style={styles.arrow}>
-                        <Icon name="navigation" size={18} color="#FFFFFF" />
-                      </View>
+                      <View style={styles.me} />
                     </Marker>
                   ) : null}
                 </MapView>
               ) : null}
             </View>
           </View>
-          <View style={{ padding: 16, paddingTop: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <LogoMark size={22} />
-              <Txt w="black" size={20}>
-                Ağıllı naviqasiya
+
+          {/* progress */}
+          <View style={styles.track}>
+            <Animated.View style={[styles.trackFill, fill]} />
+            <Animated.View style={[styles.walker, walker]}>
+              <Icon name="walk" size={13} color="#FFFFFF" />
+            </Animated.View>
+          </View>
+
+          <View style={styles.cardFoot}>
+            <ScoreRing score={snap.score} size={40} showShield={false} />
+            <View style={{ flex: 1 }}>
+              <Txt w="bold" size={13.5} color={C.ink}>
+                Ən az riskli yol
+              </Txt>
+              <Txt w="med" size={12.5} color={C.muted}>
+                {snap.remainingMin} dəq · {fmtDist(snap.remainingM)} · çatış {snap.eta}
               </Txt>
             </View>
-            <Txt w="med" size={14} color={C.muted} style={{ marginTop: 4 }}>
-              {snap.hazard
-                ? `Diqqət: ${snap.hazard} · Əhməd yönləndirir`
-                : `Ən az riskli yol · ${snap.score} bal · ${snap.remainingMin} dəq · çatış ${snap.eta}`}
-            </Txt>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* notification imitation */}
-        <View style={styles.notif}>
-          <LogoMark size={18} />
+        {/* family notification */}
+        <Animated.View entering={enter(4, 'up', 220)} style={styles.notif}>
+          <LogoMark size={34} />
           <View style={{ flex: 1 }}>
-            <Txt w="bold" size={13.5} color={C.ink} numberOfLines={1}>
-              Hara? · {fmtDist(snap.distToNext)} {snap.maneuver} · {snap.street}
+            <Txt w="bold" size={13.5} color="#FFFFFF" numberOfLines={1}>
+              Hara Ailə
             </Txt>
-            <Txt w="med" size={12.5} color={C.muted} numberOfLines={1}>
-              {snap.remainingMin} dəq · {fmtDist(snap.remainingM)} · Təhlükəsizlik {snap.score}
+            <Txt w="med" size={12.5} color="rgba(255,255,255,0.78)" numberOfLines={2}>
+              Murad məktəbə çatdı · yolda işıqforsuz keçid olmadı
             </Txt>
           </View>
-          <Txt w="med" size={11.5} color={C.muted}>
+          <Txt w="med" size={11.5} color="rgba(255,255,255,0.6)">
             indi
           </Txt>
-        </View>
+        </Animated.View>
 
         <View style={{ flex: 1 }} />
-        <Txt w="med" size={12} color={C.muted} center style={{ marginBottom: insets.bottom + 16 }}>
-          {snap.active ? 'Canlı · naviqasiya davam edir' : 'Nümunə · naviqasiyanı başladanda canlı olur'}
-          {'\n'}Bağlamaq üçün toxun
-        </Txt>
+        <Animated.View entering={enter(6, 'fade', 300)} style={{ alignItems: 'center', gap: 10, marginBottom: insets.bottom + 14 }}>
+          <View style={styles.homeBar} />
+          <Txt w="med" size={12} color="rgba(255,255,255,0.6)">
+            Bağlamaq üçün toxun
+          </Txt>
+        </Animated.View>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  widget: { width: '100%', backgroundColor: C.surface, borderRadius: R.card, overflow: 'hidden', marginTop: 26 },
-  timeline: { width: '46%', paddingVertical: 18, paddingLeft: 16, paddingRight: 6, justifyContent: 'space-between' },
-  tlItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dot: { width: 16, height: 16, borderRadius: 8, backgroundColor: C.brand, borderWidth: 4, borderColor: C.brandSoft },
-  ring: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(18,183,106,0.5)', alignItems: 'center', justifyContent: 'center', marginLeft: -3 },
-  ringInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: C.surface },
-  dash: { width: 2, flex: 1, marginLeft: 7, marginVertical: 4, borderLeftWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(15,27,45,0.22)' },
-  map: { flex: 1, backgroundColor: C.bg, borderBottomLeftRadius: 0 },
-  arrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.route, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  notif: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 22,
-    padding: 14,
-    marginTop: 12,
-  },
+  caption: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: R.pill, paddingHorizontal: 12, height: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  card: { width: '100%', backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 28, padding: 14, marginTop: 22 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  turn: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.route, alignItems: 'center', justifyContent: 'center' },
+  hazard: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.warnSoft, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
+  map: { width: 112, height: 92, borderRadius: 16, overflow: 'hidden', backgroundColor: C.surface },
+  me: { width: 16, height: 16, borderRadius: 8, backgroundColor: C.route, borderWidth: 3, borderColor: '#FFFFFF' },
+  track: { height: 8, borderRadius: 4, backgroundColor: C.bg2, marginTop: 16, marginBottom: 6, marginHorizontal: 4 },
+  trackFill: { height: 8, borderRadius: 4, backgroundColor: C.brand },
+  walker: { position: 'absolute', top: -7, marginLeft: -11, width: 22, height: 22, borderRadius: 11, backgroundColor: C.brand, borderWidth: 2.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  cardFoot: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+  liveRing: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: C.brand },
+  liveCore: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.brand },
+  notif: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 22, padding: 12, marginTop: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  homeBar: { width: 120, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.5)' },
 });

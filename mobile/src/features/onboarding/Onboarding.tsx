@@ -16,9 +16,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { HaraWordmark } from '@/components/Brand';
+import { BrandIntro } from '@/features/brand/BrandIntro';
 import { DevTrigger } from '@/components/DevTrigger';
 import { PillButton, Txt } from '@/components/ui';
 import { PressableScale, enter } from '@/motion';
@@ -56,6 +57,8 @@ function Dot({ i, scrollX, w }: { i: number; scrollX: SharedValue<number>; w: nu
 /** First run: three swipeable pages with parallax, then permission primers. Skippable. */
 export function Onboarding() {
   const insets = useSafeAreaInsets();
+  const { intro } = useLocalSearchParams<{ intro?: string }>();
+  const [showIntro, setShowIntro] = useState(intro === '1');
   const [w, setW] = useState(0);
   const [idx, setIdx] = useState(0);
   const [phase, setPhase] = useState<'pages' | 'perms'>('pages');
@@ -164,6 +167,7 @@ export function Onboarding() {
           onPress={next}
         />
       </Animated.View>
+      {showIntro ? <BrandIntro onDone={() => setShowIntro(false)} /> : null}
     </View>
   );
 }
