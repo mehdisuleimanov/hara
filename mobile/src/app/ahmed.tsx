@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
+import { Keyboard, Platform, ScrollView, StyleSheet, TextInput, View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AudioModule, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeOut, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, useAnimatedKeyboard, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { askAhmed, AHMED_SAY, DEMO_SENTENCE, scriptedReply, speakable } from '@/ai/ahmed';
 import { recommended } from '@/ai/script';
 import { useAppStore, useIsNight, type AhmedResult } from '@/store/useAppStore';
@@ -426,10 +426,15 @@ export default function AhmedScreen() {
     return { title: d.name, sub: o ? `${kind} · ${o.durationMin} dəq · ${o.price}` : kind };
   }, [result]);
 
+  // keyboard: the window does not resize edge-to-edge, so lift the content by the keyboard height (UI thread)
+  const kb = useAnimatedKeyboard();
+  const bottomInset = insets.bottom;
+  const kbPad = useAnimatedStyle(() => ({ paddingBottom: Math.max(0, kb.height.value - (kb.height.value > 0 ? bottomInset : 0)) }));
+
   const showDock = phase === 'idle' || phase === 'listening' || phase === 'answer';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Animated.View style={[{ flex: 1, backgroundColor: C.bg }, kbPad]}>
       <LinearGradient colors={['#EEF5FF', '#FFFFFF', '#FFFFFF']} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
 
       <View style={{ flex: 1, paddingTop: insets.top + 6 }}>
@@ -600,7 +605,7 @@ export default function AhmedScreen() {
           <View style={{ height: Math.max(insets.bottom, 14) + 8 }} />
         )}
       </View>
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 
