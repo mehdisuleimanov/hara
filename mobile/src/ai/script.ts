@@ -4,7 +4,7 @@
  * pre-generated Azerbaijani clip. No React Native imports (runs in Node too).
  */
 import { DESTINATIONS, destById } from '../data/destinations';
-import { optionOf, optionsFor } from '../data/routes';
+import { optionOf, optionsFor, score } from '../data/routes';
 import type { Leg, RouteKind, RouteOption } from '../data/types';
 
 /** Fixed spoken lines of the Əhməd screen (exact strings → clips). */
@@ -23,13 +23,23 @@ function metroStops(l: Leg) {
   return m ? Number(m[1]) : 0;
 }
 
-/** "metro ilə 1 dayanacaq, sonra 590 metr piyada" */
+/** "metro ilə 1 dayanacaq, sonra 590 metr piyada" (consecutive walks merged, tiny ones skipped) */
 export function spokenLegs(o: RouteOption) {
   const parts: string[] = [];
+  let walk = 0;
+  const flush = () => {
+    if (walk >= 60) parts.push(`${round10(walk)} metr piyada`);
+    walk = 0;
+  };
   for (const l of o.legs) {
     if (l.mode === 'walk') {
-      if (l.distanceM >= 60) parts.push(`${round10(l.distanceM)} metr piyada`);
-    } else if (l.mode === 'metro') {
+      walk += l.distanceM;
+      continue;
+    }
+    // the short walk to the taxi / station is not worth saying
+    if (parts.length === 0 && walk < 200) walk = 0;
+    flush();
+    if (l.mode === 'metro') {
       const n = metroStops(l);
       parts.push(n ? `metro ilə ${n} dayanacaq` : 'metro ilə');
     } else if (l.mode === 'bus') {
@@ -39,7 +49,22 @@ export function spokenLegs(o: RouteOption) {
     else if (l.mode === 'scooter') parts.push('skuterlə');
     else if (l.mode === 'bike') parts.push('velosipedlə');
   }
+  flush();
   return parts.join(', sonra ') || 'piyada';
+}
+
+const isTaxi = (o: RouteOption) => o.legs.some((l) => l.mode === 'taxi');
+
+/**
+ * The option Əhməd recommends: for "safest" the HIGHEST score for this time of day (at night the
+ * taxi can beat the walk/metro); "fastest" = shortest door-to-door; "cheapest" = that kind.
+ */
+export function recommended(destId: string, pref: RouteKind, night: boolean): RouteOption | undefined {
+  const all = optionsFor(destId);
+  if (!all.length) return undefined;
+  if (pref === 'cheapest') return optionOf(destId, 'cheapest') ?? all[0];
+  if (pref === 'fastest') return [...all].sort((a, b) => a.durationMin - b.durationMin || score(b, night) - score(a, night))[0];
+  return [...all].sort((a, b) => score(b, night) - score(a, night) || (a.kind === 'safest' ? -1 : b.kind === 'safest' ? 1 : 0))[0];
 }
 
 /** Taxi option of a destination (if any). */
@@ -96,13 +121,21 @@ export function speakable(text: string) {
     .trim();
 }
 
-function taxiSentence(destId: string) {
+/** "Neftçilər prospekti" → "Neftçilər prospektinin" */
+function genitive(street: string) {
+  if (/prospekti$/i.test(street) || /küçəsi$/i.test(street) || /meydanı$/i.test(street)) return `${street}nin`;
+  return '';
+}
+
+/** " Taksi isə səni … qarşı tərəfində düşürür …" (leading space), or '' */
+export function taxiSentence(destId: string) {
   const drop = taxiDrop(destId);
   if (!drop) return '';
   if (drop.wrongSide) {
-    return drop.lanes
-      ? ` Taksi isə səni yolun qarşı tərəfində düşürür, ${drop.lanes} zolaqlı yolu keçməli olardın.`
-      : ' Taksi isə səni yolun qarşı tərəfində düşürür.';
+    const lm = taxiOption(destId)?.lastMeters;
+    const g = lm?.street ? genitive(lm.street) : '';
+    const where = g ? `${g} qarşı tərəfində` : 'yolun qarşı tərəfində';
+    return drop.lanes ? ` Taksi isə səni ${where} düşürür, ${drop.lanes} zolağı keçməli olardın.` : ` Taksi isə səni ${where} düşürür.`;
   }
   return drop.warning ? ` Taksi ilə getsən, diqqət: ${warnPhrase(drop.warning)}.` : '';
 }
@@ -114,20 +147,26 @@ function taxiSentence(destId: string) {
 export function scriptedReply(destId: string | null, pref: RouteKind, night: boolean): string {
   if (!destId) return AHMED_SAY.askWhere;
   const d = destById(destId);
-  const o = optionOf(destId, pref) ?? optionOf(destId, 'safest');
+  const o = recommended(destId, pref, night);
   if (!d || !o) return AHMED_SAY.askWhere;
-  if (o.kind === 'safest') {
-    const to = toDest(d.id, d.short);
-    const head = night ? `Gecədir, ona görə ${to} ən az riskli yolu seçdim` : `${upperFirst(to)} ən az riskli yol`;
-    return `${head}: ${spokenLegs(o)}, cəmi ${o.durationMin} dəqiqə.${taxiSentence(destId)}`;
-  }
-  if (o.kind === 'cheapest') {
+  const to = toDest(d.id, d.short);
+  if (pref === 'cheapest') {
     const price = /^0\s*₼$/.test(o.price.trim()) ? 'pulsuzdur' : o.price;
     const warn = o.warning ? ` Amma diqqət: ${warnPhrase(o.warning)}.` : '';
-    return `${upperFirst(toDest(d.id, d.short))} ən sərfəli yol ${price}: ${spokenLegs(o)}, ${o.durationMin} dəqiqə.${warn}`;
+    return `${upperFirst(to)} ən sərfəli yol ${price}: ${spokenLegs(o)}, ${o.durationMin} dəqiqə.${warn}`;
   }
-  const warn = o.warning ? ` Diqqət: ${warnPhrase(o.warning)}.` : '';
-  return `${upperFirst(toDest(d.id, d.short))} ən tez yol taksidir: ${o.durationMin} dəqiqə, təxminən ${o.price}.${warn}`;
+  if (pref === 'fastest') {
+    const how = isTaxi(o) ? `taksidir: ${o.durationMin} dəqiqə, təxminən ${o.price}` : `${spokenLegs(o)}, ${o.durationMin} dəqiqə`;
+    const warn = o.warning ? ` Diqqət: ${warnPhrase(o.warning)}.` : '';
+    return `${upperFirst(to)} ən tez yol ${how}.${warn}`;
+  }
+  // safest = highest score now
+  const head = night ? `Gecədir, ona görə ${to} ən az riskli yolu seçdim` : `${upperFirst(to)} ən az riskli yol`;
+  if (isTaxi(o)) {
+    const why = night ? ' Piyada yolda gecə riskli keçidlər var.' : '';
+    return `${head}: taksi, təxminən ${o.price}, ${o.durationMin} dəqiqə.${why}`;
+  }
+  return `${head}: ${spokenLegs(o)}, cəmi ${o.durationMin} dəqiqə.${taxiSentence(destId)}`;
 }
 
 /** Spoken answer to a safety question about an area, from safety-layer counts (offline path). */

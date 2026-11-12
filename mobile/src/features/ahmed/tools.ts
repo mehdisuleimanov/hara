@@ -4,12 +4,12 @@
  * trace always reflects work that really happened.
  */
 import { DESTINATIONS, destById } from '@/data/destinations';
-import { optionsFor, optionOf, summary, score } from '@/data/routes';
-import { CROSSING_TYPE, LAYER, crossingsNearTrack } from '@/data/layer';
+import { optionsFor, optionOf, summary, score, titleOf, lastMetersFact } from '@/data/routes';
+import { CROSSING_TYPE, LAYER, crossingFactors, crossingStreet, crossingsNearTrack } from '@/data/layer';
 import type { Profile, RouteKind, RouteOption } from '@/data/types';
 import type { FunctionDecl } from '@/ai/gemini';
 import { matchIntent } from '@/ai/fallback';
-import { taxiDrop, taxiOption } from '@/ai/script';
+import { recommended, taxiDrop, taxiOption } from '@/ai/script';
 import { routeTo, type LiveRoute } from '@/features/routing/live';
 import { getWeather } from '@/utils/weather';
 import { GUST_LIMIT, SEAFRONT_WIND_LIMIT } from '@/store/useAppStore';
@@ -18,6 +18,8 @@ import type { AhmedStep } from '@/store/useAppStore';
 export type ToolCtx = {
   night: boolean;
   profile: Profile;
+  /** user's preference — decides which option is flagged as recommended */
+  preference?: RouteKind;
   /** called when route_to_place computed a live route */
   onLive?: (r: LiveRoute) => void;
   /** weather fetch budget (shorter when we already know the network is down) */
@@ -104,7 +106,9 @@ function countsJson(c: Counts, night: boolean): Json {
     underpass: c.underpass,
     unsignalized_total: c.zebra + c.unmarked,
     average_score: night ? c.avgNight : c.avgDay,
-    worst_crossing: w ? { type: CROSSING_TYPE[w[2]], score: night ? w[4] : w[3], lanes: w[5] || undefined } : null,
+    worst_crossing: w
+      ? { type: CROSSING_TYPE[w[2]], street: crossingStreet(w) ?? undefined, score: night ? w[4] : w[3], lanes: w[5] || undefined, why: crossingFactors(w) }
+      : null,
   };
 }
 
@@ -119,7 +123,7 @@ function areaCounts(lat: number, lon: number, radiusM: number) {
 
 const LEG_WORD: Record<string, string> = { walk: 'walk', metro: 'metro', bus: 'bus', taxi: 'taxi', scooter: 'scooter', bike: 'bike' };
 
-function optionJson(o: RouteOption, night: boolean): Json {
+function optionJson(o: RouteOption, night: boolean, rec?: RouteOption): Json {
   const lm = o.lastMeters;
   const legs = o.legs.map((l) => {
     const stops = l.mode === 'metro' ? (l.stations && l.stations.length > 1 ? l.stations.length - 1 : Number(/(\d+)\s*dayanacaq/.exec(l.label ?? '')?.[1] ?? 0) || undefined) : undefined;
@@ -134,6 +138,8 @@ function optionJson(o: RouteOption, night: boolean): Json {
   }).filter((l) => !(l.mode === 'walk' && l.meters < 30));
   return {
     kind: o.kind,
+    title: titleOf(o),
+    recommended: rec ? rec === o : undefined,
     summary: summary(o),
     legs,
     door_to_door_minutes: o.durationMin,
@@ -145,7 +151,7 @@ function optionJson(o: RouteOption, night: boolean): Json {
     reasons: o.reasons,
     warning: o.warning,
     last_meters: lm
-      ? { wrong_side: lm.wrongSide, lanes: lm.lanes, street: lm.street, note: lm.note, extra_walk_min: lm.extraMin }
+      ? { wrong_side: lm.wrongSide, lanes: lm.lanes, street: lm.street, fact: lastMetersFact(lm) }
       : undefined,
   };
 }
@@ -174,12 +180,14 @@ function getRouteOptions(args: Json, ctx: ToolCtx): Json {
   const d = destById(id);
   if (!d) return { found: false, catalog: IDS };
   const night = nightOf(ctx, args.time_of_day);
+  const rec = recommended(id, ctx.preference ?? 'safest', night);
   return {
     found: true,
     origin: '28 May m.',
     destination: d.name,
     time_of_day: night ? 'night' : 'day',
-    options: optionsFor(id).map((o) => optionJson(o, night)),
+    recommended_kind: rec?.kind,
+    options: optionsFor(id).map((o) => optionJson(o, night, rec)),
   };
 }
 
@@ -233,7 +241,7 @@ function checkTaxiDropoff(args: Json): Json {
     extra_walk_m: lm ? Math.round(lm.extraM) : undefined,
     extra_walk_min: lm?.extraMin,
     better_drop_point: lm?.betterDrop?.label,
-    note: lm?.note ?? drop.warning,
+    fact: lm ? lastMetersFact(lm) : drop.warning,
   };
 }
 
@@ -247,7 +255,7 @@ async function routeToPlace(args: Json, ctx: ToolCtx): Promise<Json> {
     found: true,
     place: r.place.name,
     district: r.place.district,
-    options: r.options.map((o) => optionJson(o, ctx.night)),
+    options: r.options.map((o) => optionJson(o, ctx.night, [...r.options].sort((a, b) => score(b, ctx.night) - score(a, ctx.night))[0])),
   };
 }
 

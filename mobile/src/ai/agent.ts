@@ -13,7 +13,7 @@ import { COMMON } from '@/voice/lines/common';
 import { log } from '@/utils/log';
 import { GEMINI_KEY, GeminiError, geminiJson, geminiTurn, type Content, type Part } from './gemini';
 import { matchIntent, norm } from './fallback';
-import { AHMED_SAY, scriptedAreaAnswer, scriptedReply } from './script';
+import { AHMED_SAY, recommended, scriptedAreaAnswer, scriptedReply, taxiSentence } from './script';
 import { TOOL_DECLS, TOOL_LABEL, runTool, stepOutcome, type ToolCtx } from '@/features/ahmed/tools';
 import type { LiveRoute } from '@/features/routing/live';
 
@@ -96,8 +96,10 @@ How you work:
 
 Rules for the answer:
 - Start directly with the answer (no greeting). Keep it under ~28 words for a route, ~40 for a question — it is spoken aloud.
-- Route request: 1–2 short spoken sentences. Recommend the option matching the user's preference (safest by default) and say why, using its numbers. If the taxi drops the user on the wrong side of a multi-lane road, mention it briefly. If gusts are too strong for a scooter, say so.
+- Route request: 1–2 short spoken sentences. Recommend the option flagged "recommended": true (for "safest" it is the highest safety_score for this time of day — at night that can be the taxi) and say why, using its numbers. If the taxi drops the user on the wrong side of a multi-lane road (check_taxi_dropoff), mention it briefly with the street name. If gusts are too strong for a scooter, say so.
 - Question: 2–3 short spoken sentences with the concrete counts you got. Name the area exactly as the tool's "area" field says (e.g. "Nizami m. ətrafında"), never a different street.
+- Vocabulary: unsignalized = "işıqforsuz" (no traffic light), unmarked = "nişansız", underpass = "yeraltı keçid". Lighting is a different thing (only from "why").
+- If check_taxi_dropoff returns wrong_side=true and you recommend a non-taxi option, your second sentence warns that the taxi drops them on the other side of that street.
 - Use ONLY facts returned by the tools. Never invent streets, numbers, prices, times or places.
 - Never say "100% təhlükəsiz", "tam təhlükəsiz" or "tamamilə təhlükəsiz" — say "ən az riskli" or "daha təhlükəsiz".
 - Prices exactly as given (e.g. "0,60 ₼"); minutes as "14 dəqiqə".
@@ -367,7 +369,7 @@ export async function runAgent(input: AgentInput, opts: AgentOpts): Promise<Ahme
 
   // ---- Stage 2: reason with tools
   const liveBox: { r: LiveRoute | null } = { r: null };
-  const ctx: ToolCtx = { night, profile, onLive: (r) => (liveBox.r = r), weatherTimeoutMs: local ? 1500 : 2500 };
+  const ctx: ToolCtx = { night, profile, preference, onLive: (r) => (liveBox.r = r), weatherTimeoutMs: local ? 1500 : 2500 };
   const results: { name: string; args: Record<string, unknown>; result: Record<string, unknown> }[] = [];
   const ids = stepIds();
 
@@ -440,7 +442,8 @@ ${JSON.stringify(request)}` }],
     // Make sure the facts behind the card are computed (truthfully labeled, no fake "calls").
     if (!has('get_weather')) await localCall('get_weather', {}, { hideIfUnavailable: true });
     if (!has('get_route_options')) await localCall('get_route_options', { destination_id: destId, time_of_day: night ? 'night' : 'day' });
-    if (!has('query_safety_layer')) await localCall('query_safety_layer', { destination_id: destId, route_kind: preference, time_of_day: night ? 'night' : 'day' });
+    if (!has('query_safety_layer'))
+      await localCall('query_safety_layer', { destination_id: destId, route_kind: recommended(destId, preference, night)?.kind ?? preference, time_of_day: night ? 'night' : 'day' });
     if (!has('check_taxi_dropoff')) await localCall('check_taxi_dropoff', { destination_id: destId });
   }
 
@@ -458,6 +461,12 @@ ${JSON.stringify(request)}` }],
   if (modelReply && !BANNED.test(modelReply) && grounded(modelReply, sources)) {
     reply = capSentences(modelReply, intent === 'question' ? 3 : 2);
     source = 'ai';
+    // the "last 50 meters" warning is the point of the product — never drop it
+    if (intent === 'route' && destId && !/taksi/i.test(reply)) {
+      const rec = recommended(destId, preference, night);
+      const drop = results.find((r) => r.name === 'check_taxi_dropoff')?.result;
+      if (rec && !rec.legs.some((l) => l.mode === 'taxi') && drop?.wrong_side) reply = `${reply} ${taxiSentence(destId).trim()}`.trim();
+    }
   } else if (modelReply) {
     log('[Əhməd] model reply rejected (ungrounded/banned):', modelReply);
   }

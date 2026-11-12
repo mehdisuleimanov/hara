@@ -7,11 +7,11 @@ import { AudioModule, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { askAhmed, AHMED_SAY, DEMO_SENTENCE, scriptedReply, speakable } from '@/ai/ahmed';
+import { recommended } from '@/ai/script';
 import { useAppStore, useIsNight, type AhmedResult } from '@/store/useAppStore';
 import { usePrefs } from '@/store/prefs';
 import { useAhmedSession } from '@/store/ahmedSession';
 import { destById } from '@/data/destinations';
-import { optionOf } from '@/data/routes';
 import { crossingsNearTrack } from '@/data/layer';
 import { liveRouteById } from '@/features/routing/live';
 import { ThinkingTrace } from '@/features/ahmed/ThinkingTrace';
@@ -138,7 +138,8 @@ export default function AhmedScreen() {
   const routeHref = (r: AhmedResult) => {
     if (r.liveRouteId) return `/results/live:${r.liveRouteId}?from=ahmed&speak=0`;
     if (r.profile === 'scooter') return '/scooter';
-    return `/results/${r.destId}?kind=${r.preference}&from=ahmed&speak=0`;
+    const rec = r.destId ? recommended(r.destId, r.preference, r.timeOfDay ? r.timeOfDay === 'night' : night) : undefined;
+    return `/results/${r.destId}?kind=${rec?.kind ?? r.preference}&from=ahmed&speak=0`;
   };
 
   const openRoute = useCallback((r: AhmedResult) => {
@@ -420,7 +421,7 @@ export default function AhmedScreen() {
     }
     const d = result.destId ? destById(result.destId) : null;
     if (!d) return null;
-    const o = optionOf(d.id, result.preference) ?? optionOf(d.id, 'safest');
+    const o = recommended(d.id, result.preference, result.timeOfDay ? result.timeOfDay === 'night' : night);
     const kind = result.preference === 'cheapest' ? 'Ən sərfəli' : result.preference === 'fastest' ? 'Ən sürətli' : 'Ən az riskli';
     return { title: d.name, sub: o ? `${kind} · ${o.durationMin} dəq · ${o.price}` : kind };
   }, [result]);
