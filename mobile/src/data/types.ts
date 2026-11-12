@@ -28,6 +28,8 @@ export type Leg = {
   underground?: boolean;
   /** metro stations passed on this leg, in order (first = board, last = alight) */
   stations?: { name: string; lat: number; lon: number }[];
+  /** walk inside a metro station (entrance, exit, transfer passage): not street exposure, not scored */
+  indoor?: boolean;
 };
 
 /**
