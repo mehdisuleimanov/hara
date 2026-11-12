@@ -8,7 +8,9 @@ export const ORIGIN = {
   lon: 49.84868,
 };
 
-// Coordinates verified with Nominatim (OSM) on 2026-11-12.
+// Coordinates verified with Nominatim (OSM) on 2026-11-12. Hilton and Gənclik Mall pins sit on the
+// OSM entrance nodes (12995178863, 3093864434) so every route ends at the door, not the roof;
+// Nizami m. sits on its metro entrance (node 3696588950).
 export const DESTINATIONS: Destination[] = [
   {
     id: 'hilton',
@@ -17,8 +19,8 @@ export const DESTINATIONS: Destination[] = [
     district: 'Səbail · Azadlıq pr.',
     icon: 'office-building-outline',
     aliases: ['hilton', 'hiltona', 'hilton baku', 'hiltonun', 'otel', 'hotel'],
-    lat: 40.37211,
-    lon: 49.84959,
+    lat: 40.3717,
+    lon: 49.84956,
   },
   {
     id: 'icherisheher',
@@ -47,8 +49,8 @@ export const DESTINATIONS: Destination[] = [
     district: 'Nərimanov · F. X. Xoyski pr.',
     icon: 'shopping-outline',
     aliases: ['genclik', 'gencliy', 'genclik mall', 'ganjlik', 'gencilik'],
-    lat: 40.39986,
-    lon: 49.8528,
+    lat: 40.40019,
+    lon: 49.85161,
   },
   {
     id: 'ada',
@@ -87,8 +89,8 @@ export const DESTINATIONS: Destination[] = [
     district: 'Yasamal · Cəfər Cabbarlı küç.',
     icon: 'subway-variant',
     aliases: ['nizami', 'nizami metro', 'nizami metrosu', 'nizamiye'],
-    lat: 40.37984,
-    lon: 49.83062,
+    lat: 40.37925,
+    lon: 49.82999,
   },
   {
     id: 'ev',
