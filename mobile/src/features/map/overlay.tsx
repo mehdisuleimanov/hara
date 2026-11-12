@@ -21,6 +21,7 @@ export type MapOverlayApi = {
   onRegionChangeComplete: () => void;
   /** re-project everything now (e.g. after onMapReady) */
   refresh: () => void;
+  isMoving: () => boolean;
 };
 
 export function useMapOverlay(mapRef: React.RefObject<MapView | null>): MapOverlayApi {
@@ -45,7 +46,10 @@ export function useMapOverlay(mapRef: React.RefObject<MapView | null>): MapOverl
         moving.current = false;
         subs.current.forEach((f) => f('end'));
       },
-      refresh: () => subs.current.forEach((f) => f('end')),
+      refresh: () => {
+        if (!moving.current) subs.current.forEach((f) => f('end'));
+      },
+      isMoving: () => moving.current,
     }),
     [mapRef],
   );
@@ -89,7 +93,7 @@ export function Anchored({
     if (!m) return;
     try {
       const p = await m.pointForCoordinate({ latitude: lat, longitude: lon });
-      if (!p || !Number.isFinite(p.x)) return;
+      if (!p || !Number.isFinite(p.x) || api.isMoving()) return;
       pt.current = p;
       place();
       op.value = withTiming(1, { duration: 200 });

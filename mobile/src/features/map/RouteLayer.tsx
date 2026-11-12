@@ -90,18 +90,19 @@ export const RouteLayer = memo(function RouteLayer({
 }) {
   const sel = options.find((o) => o.id === selectedId) ?? options[0];
   const geo = useMemo(() => (sel ? legGeos(sel) : null), [sel]);
+  const done = t >= 0.999;
+  // PERF: the safety layer JSON is parsed lazily -> only once the line has been drawn
   const stations = useMemo(
     () =>
-      sel
+      sel && done
         ? sel.legs.flatMap((l, li) =>
             l.mode === 'metro' ? legStations(l, sel).map((s, i, arr) => ({ s, major: i === 0 || i === arr.length - 1, key: `${li}-${i}` })) : [],
           )
         : [],
-    [sel],
+    [sel, done],
   );
-  const cross = useMemo(() => (sel && showCrossings ? crossingsAlong(sel) : []), [sel, showCrossings]);
+  const cross = useMemo(() => (sel && showCrossings && done ? crossingsAlong(sel) : []), [sel, showCrossings, done]);
   if (!sel || !geo) return null;
-  const done = t >= 0.999;
   return (
     <>
       {/* alternatives fade in once the selected route is on its way */}

@@ -52,6 +52,8 @@ function rubber(v: number, max: number) {
 /** Cards fly in from below with a gentle spring (Əhməd hand-off). */
 function flyIn(delay: number) {
   if (prefs().liteFx) return FadeIn.duration(160).delay(Math.min(delay, 200));
+  // web preview supports only predefined layout animations
+  if (Platform.OS === 'web') return FadeInDown.duration(420).delay(delay);
   return (() => {
     'worklet';
     return {
@@ -384,7 +386,7 @@ function ResultsView({
         showsBuildings={lmOpen}
         rotateEnabled={false}
       >
-        <RouteLayer options={options} selectedId={opt.id} t={t} night={night} dark={look.dark} showCrossings={!lmOpen} />
+        {!lmOpen ? <RouteLayer options={options} selectedId={opt.id} t={t} night={night} dark={look.dark} /> : null}
         <Marker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={30}>
           <MeArrow size={34} heading={20} />
         </Marker>

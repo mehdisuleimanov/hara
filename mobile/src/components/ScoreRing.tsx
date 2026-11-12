@@ -1,6 +1,6 @@
 import React, { memo, useEffect } from 'react';
 import { View } from 'react-native';
-import Animated, { Easing, interpolateColor, useAnimatedProps, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { C, scoreColor } from '@/theme';
 import { useCountUp } from '@/motion/AnimatedNumber';
@@ -10,8 +10,7 @@ import { Icon, Txt } from './ui';
 const ACircle = Animated.createAnimatedComponent(Circle);
 
 /**
- * Circular 0–100 safety score. The ring sweeps on the UI thread (and blends its color
- * through the risk scale), the number counts up. When `score` changes (day ⇄ night) both
+ * Circular 0–100 safety score. The ring sweeps on the UI thread, the number counts up. When `score` changes (day ⇄ night) both
  * animate from the previous value. `animate={false}` renders the final state at once.
  */
 export const ScoreRing = memo(function ScoreRing({
@@ -44,7 +43,6 @@ export const ScoreRing = memo(function ScoreRing({
   }, [target, still, delay, p]);
   const ap = useAnimatedProps(() => ({
     strokeDashoffset: circ * (1 - p.value / 100),
-    stroke: interpolateColor(p.value, [0, 54, 56, 74, 76, 100], [C.danger, C.danger, C.warn, C.warn, C.safe, C.safe]),
   }));
   const num = still ? target : shown;
   return (

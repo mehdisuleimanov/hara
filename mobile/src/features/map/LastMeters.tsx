@@ -174,7 +174,7 @@ export function LastMetersCard({
         ) : (
           <>
             <Tile tone="danger" icon="alert-octagon-outline" value={`${lm.lanes} zolaq`} label="birbaşa keçmək riskli" />
-            <Tile tone="safe" icon={lm.crossing?.type === 3 ? 'stairs-down' : 'traffic-light'} value={`+${Math.max(1, lm.extraMin)} dəq`} label={`${crossingWord} · ${Math.round(lm.extraM / 10) * 10} m`} />
+            <Tile tone="safe" icon={lm.crossing?.type === 3 ? 'stairs-down' : 'traffic-light'} value={`+${Math.max(1, lm.extraMin)} dəq`} label={`${crossingWord} · ${Math.round(lm.extraM / 10) * 10}\u00A0m`} />
           </>
         )}
       </Animated.View>
@@ -217,10 +217,10 @@ function ActionBtn({ label, icon, variant, onPress, grow }: { label: string; ico
       haptic="medium"
       scaleTo={0.97}
       onPress={onPress}
-      style={[styles.action, grow ? { flex: 1 } : { paddingHorizontal: 16 }, brand ? { backgroundColor: C.brand } : { backgroundColor: C.bg2 }]}
+      style={[styles.action, grow ? { flex: brand ? 1.25 : 1 } : { paddingHorizontal: 16 }, brand ? { backgroundColor: C.brand } : { backgroundColor: C.bg2 }]}
     >
       <Icon name={icon} size={19} color={brand ? '#FFFFFF' : C.ink} />
-      <Txt w="bold" size={14.5} color={brand ? '#FFFFFF' : C.ink} numberOfLines={1}>
+      <Txt w="bold" size={14} color={brand ? '#FFFFFF' : C.ink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ flexShrink: 1 }}>
         {label}
       </Txt>
     </PressableScale>
@@ -257,5 +257,5 @@ const styles = StyleSheet.create({
   ahmed: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.aiSoft, borderRadius: 18, padding: 10, marginTop: 12 },
   ahmedArt: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   play: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ai, alignItems: 'center', justifyContent: 'center' },
-  action: { height: 52, borderRadius: R.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  action: { height: 52, borderRadius: R.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
 });

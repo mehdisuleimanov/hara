@@ -137,50 +137,60 @@ export const RouteCard = React.memo(function RouteCard({
         : option.reasons.length
           ? { label: option.reasons[option.reasons.length - 1], tone: 'safe' }
           : null;
+  // the select target is a full-card layer UNDER the content, so the last-meters chip can be
+  // its own button (no nested buttons on web)
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${KIND_LABEL[option.kind]}, ${option.durationMin} dəqiqə, ${option.price}, bal ${s}`}
-      onPress={() => {
-        tap();
-        onPress();
-      }}
-    >
-      <Animated.View style={[styles.card, a]}>
+    <Animated.View style={[styles.card, a]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${KIND_LABEL[option.kind]}, ${option.durationMin} dəqiqə, ${option.price}, bal ${s}`}
+        onPress={() => {
+          tap();
+          onPress();
+        }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View pointerEvents="none">
         <ScoreRing score={s} size={58} showShield={false} delay={ringDelay} />
-        <View style={{ flex: 1, gap: 7 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Txt w="xbold" size={16.5} numberOfLines={1} style={{ flexShrink: 1 }}>
-              {KIND_LABEL[option.kind]}
-            </Txt>
-            {recommended ? (
-              <View style={styles.rec}>
-                <Icon name="star-four-points" size={11} color={C.onBrand} />
-                <Txt w="bold" size={10.5} color={C.onBrand} ls={0.6}>
-                  ƏHMƏD SEÇDİ
-                </Txt>
-              </View>
-            ) : null}
-          </View>
-          <ModeChain option={option} />
-          {chip ? <RiskChip label={chip.label} tone={chip.tone} onPress={chip.press} /> : null}
+      </View>
+      <View style={{ flex: 1, gap: 7 }} pointerEvents="box-none">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="none">
+          <Txt w="xbold" size={16.5} numberOfLines={1} style={{ flexShrink: 1 }}>
+            {KIND_LABEL[option.kind]}
+          </Txt>
+          {recommended ? (
+            <View style={styles.rec}>
+              <Icon name="star-four-points" size={11} color={C.onBrand} />
+              <Txt w="bold" size={10.5} color={C.onBrand} ls={0.6}>
+                ƏHMƏD
+              </Txt>
+            </View>
+          ) : null}
         </View>
-        <View style={{ alignItems: 'flex-end', minWidth: 64 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-            <Txt v="num" size={26} lh={30}>
-              {option.durationMin}
-            </Txt>
-            <Txt w="semi" size={13} color={C.muted}>
-              dəq
-            </Txt>
+        <View pointerEvents="none">
+          <ModeChain option={option} />
+        </View>
+        {chip ? (
+          <View pointerEvents={chip.press ? 'box-none' : 'none'}>
+            <RiskChip label={chip.label} tone={chip.tone} onPress={chip.press} />
           </View>
-          <Txt w="bold" size={14} color={C.ink2} style={{ marginTop: 2 }}>
-            {option.price}
+        ) : null}
+      </View>
+      <View style={{ alignItems: 'flex-end', minWidth: 64 }} pointerEvents="none">
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+          <Txt v="num" size={26} lh={30}>
+            {option.durationMin}
+          </Txt>
+          <Txt w="semi" size={13} color={C.muted}>
+            dəq
           </Txt>
         </View>
-      </Animated.View>
-    </Pressable>
+        <Txt w="bold" size={14} color={C.ink2} style={{ marginTop: 2 }}>
+          {option.price}
+        </Txt>
+      </View>
+    </Animated.View>
   );
 });
 
