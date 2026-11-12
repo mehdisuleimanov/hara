@@ -12,7 +12,7 @@ export const REPORT_META: Record<
   speed: { title: 'Sürətli maşınlar', icon: 'car-speed-limiter', tone: 'danger' },
 };
 
-// Plausible demo reports around central Baku.
+// Seed community reports around central Baku (merged with live user reports in the store).
 export const SEED_REPORTS: Report[] = [
   { id: 'r1', category: 'crossing', lat: 40.37755, lon: 49.84452, minutesAgo: 12, aiConfidence: 91, count: 7 },
   { id: 'r2', category: 'dark', lat: 40.38262, lon: 49.83561, minutesAgo: 46, aiConfidence: 88, count: 4 },
