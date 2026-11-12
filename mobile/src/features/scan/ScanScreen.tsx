@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, StyleSheet, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
-import Animated, { FadeIn, SlideInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,7 @@ import { analyzePhoto, rate, type Rating, type VisionAttrs } from '@/ai/vision';
 import { GeminiError } from '@/ai/gemini';
 import { AhmedAvatar } from '@/components/Brand';
 import { CircleButton, Icon, PillButton, Txt } from '@/components/ui';
-import { enter, Glow, PressableScale, SPRING } from '@/motion';
+import { enter, Glow, PressableScale } from '@/motion';
 import { C, R } from '@/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { useScanStore } from '@/store/scan';
@@ -82,13 +82,6 @@ export function ScanScreen() {
     },
     [],
   );
-
-  // stage: full screen camera → frozen frame docks to the top
-  const stageH = useSharedValue(H);
-  useEffect(() => {
-    stageH.value = withSpring(phase === 'capture' ? H : stageFinal, SPRING.sheet);
-  }, [phase, H, stageFinal, stageH]);
-  const stageStyle = useAnimatedStyle(() => ({ height: stageH.value }));
 
   const finish = useCallback((my: number, attrs: VisionAttrs, frameInfo: Frame) => {
     if (my !== run.current) return;
@@ -207,8 +200,8 @@ export function ScanScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.navy }}>
       <StatusBar style="light" />
-      <Animated.View style={[{ width: W, overflow: 'hidden', backgroundColor: C.navy }, stageStyle]}>
-        {phase === 'capture' ? (
+      {phase === 'capture' ? (
+        <View style={{ width: W, height: H, overflow: 'hidden' }}>
           <CapturePane
             w={W}
             h={H}
@@ -223,10 +216,12 @@ export function ScanScreen() {
             onShoot={capture}
             onSample={startSample}
           />
-        ) : frame ? (
-          <Stage source={frame.source} iw={frame.iw} ih={frame.ih} w={W} h={stageFinal} phase={phase} boxes={result?.attrs.boxes ?? []} />
-        ) : null}
-      </Animated.View>
+        </View>
+      ) : (
+        <View style={{ width: W, height: stageFinal, overflow: 'hidden', backgroundColor: C.navy }}>
+          {frame ? <Stage key={String(frame.sampleId ?? (frame.source as { uri?: string }).uri)} source={frame.source} iw={frame.iw} ih={frame.ih} w={W} h={stageFinal} phase={phase} boxes={result?.attrs.boxes ?? []} /> : null}
+        </View>
+      )}
 
       {phase !== 'capture' ? (
         <Animated.View

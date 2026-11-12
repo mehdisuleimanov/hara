@@ -146,8 +146,9 @@ function SpotDetail({ s, mode }: { s: RiskSpot; mode: Mode }) {
         </View>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        <Tag label={CROSSING_LABEL[s.type]} icon={s.type === 0 ? 'traffic-light-outline' : 'walk'} bg={C.bg} />
-        <Tag label={`${s.lanes} zolaq`} icon="road-variant" bg={C.bg} />
+        {s.factors.map((f) => (
+          <Tag key={f} label={f} bg={C.bg} />
+        ))}
         <Tag label={`Gündüz ${s.day} · Gecə ${s.night}`} icon="weather-night" bg={C.bg} />
         <Tag label={`Təxmini axın: ${demandLabel}`} icon="account-group-outline" bg={C.aiSoft} color={C.ai} />
         {s.metro ? <Tag label={`${s.metro} metro girişi yaxında`} icon="subway-variant" bg={C.bg} /> : null}
@@ -258,20 +259,26 @@ export function CityScreen() {
         {/* KPIs */}
         {k ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <KpiTile i={0} icon="map-marker-radius-outline" tint={C.purple} color={C.route} value={k.crossings} label="Təhlil olunan keçid" caption={`${fmt(k.types[0])} işıqforlu · ${fmt(k.types[3])} yeraltı`} />
+            <KpiTile i={0} icon="map-marker-radius-outline" tint={C.purple} color={C.route} value={k.crossings} label="Təhlil olunan keçid" caption={`${fmt(k.types[0])} işıqforlu · ${fmt(k.types[3])} pilləkənli`} />
             <KpiTile i={1} icon="traffic-light-outline" tint={C.dangerSoft} color={C.danger} value={k.unsignalizedMultiLane} label="Çoxzolaqlı yolda işıqforsuz keçid" caption="4+ zolaq · zebra və ya nişansız" />
             <KpiTile
               i={2}
               icon={night ? 'weather-night' : 'white-balance-sunny'}
               tint={C.warnSoft}
               color={C.warn}
-              value={k.riskyStreetPct}
-              decimals={1}
-              suffix="%"
-              label={night ? 'Gecə yüksək riskli küçə' : 'Yüksək riskli küçə'}
-              caption={`${fmt(k.riskyStreetKm)} km / ${fmt(k.totalStreetKm)} km`}
+              value={k.bands.risky}
+              label={night ? 'Gecə riskli keçid' : 'Gündüz riskli keçid'}
+              caption={`${Math.round((k.bands.risky / k.crossings) * 100)}% · bal 55-dən aşağı`}
             />
-            <KpiTile i={3} icon="road-variant" tint={C.dangerSoft} color={C.danger} value={k.redSegments} label="Qırmızı seqment" caption={`bal 55-dən aşağı · ${fmt(k.segments)} seqmentdən`} />
+            <KpiTile
+              i={3}
+              icon="lightbulb-question-outline"
+              tint={C.aiSoft}
+              color={C.ai}
+              value={k.noLightData}
+              label="İşıqlandırma məlumatı olmayan keçid"
+              caption={`${Math.round((k.noLightData / k.atGrade) * 100)}% · AI Göz bu boşluğu doldurur`}
+            />
           </View>
         ) : (
           <KpiSkeleton />
@@ -345,7 +352,7 @@ export function CityScreen() {
                 <View style={{ paddingHorizontal: 10, height: 28, borderRadius: 14, backgroundColor: C.glass, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: layer === 'risk' ? C.danger : C.ai }} />
                   <Txt w="semi" size={12} color={C.ink}>
-                    {layer === 'risk' ? `${night ? 'Gecə' : 'Gündüz'} riskli keçidlər · ilk 10 nöqtə` : 'Təxmini piyada axını · OSM modeli'}
+                    {layer === 'risk' ? `${night ? 'Gecə' : 'Gündüz'} ən riskli keçidlər · ilk 10 nöqtə` : 'Təxmini piyada axını · OSM modeli'}
                   </Txt>
                 </View>
               </View>
@@ -387,7 +394,7 @@ export function CityScreen() {
                 {selBarrier.name}
               </Txt>
               <Txt v="bodyS" color={C.ink2}>
-                Yeraltı keçid. {selBarrier.nearestAtGradeM ? `Ən yaxın yerüstü keçid ${fmt(selBarrier.nearestAtGradeM)} m aralıdadır.` : 'Yaxınlıqda yerüstü keçid yoxdur.'} Lift və ya pandus
+                Pilləkənli keçid (yeraltı və ya yerüstü). {selBarrier.nearestAtGradeM ? `Ən yaxın yerüstü keçid ${fmt(selBarrier.nearestAtGradeM)} m aralıdadır.` : 'Yaxınlıqda yerüstü keçid yoxdur.'} Lift və ya pandus
                 olmadan əlil və uşaq arabası üçün keçid yoxdur.
               </Txt>
             </Surface>
@@ -432,7 +439,7 @@ export function CityScreen() {
           }
         />
         <Txt v="bodyS" color={C.ink2}>
-          Burada yolun yeganə keçidi yeraltıdır: 300 m daxilində yerüstü keçid yoxdur. Əlil arabası və uşaq arabası ilə keçmək mümkün deyil.
+          Bu yerlərdə yolu yalnız pilləkənli yeraltı və ya yerüstü keçidlə keçmək olur: 300 m daxilində səviyyədə keçid yoxdur. Əlil arabası və uşaq arabası üçün alternativ yoxdur. Sıra təxmini piyada axınına görədir.
         </Txt>
         {ready ? (
           <View style={{ gap: 8 }}>
@@ -470,17 +477,33 @@ export function CityScreen() {
         {/* open-data gap */}
         {k ? (
           <Animated.View entering={enter(0, 'up', 120)}>
-            <View style={{ padding: 16, borderRadius: R.lg, backgroundColor: C.aiSoft, gap: 8 }}>
+            <View style={{ padding: 16, borderRadius: R.lg, backgroundColor: C.aiSoft, gap: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Icon name="lightbulb-off-outline" size={20} color={C.ai} />
-                <Txt w="bold" size={15} color={C.ink}>
-                  Məlumat boşluğu: küçə işıqlandırması
+                <Txt w="bold" size={15} color={C.ink} style={{ flex: 1 }}>
+                  Məlumat boşluğu: işıqlandırma
+                </Txt>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+                <AnimatedNumber value={k.noLightData} v="num" size={30} color={C.ai} />
+                <Txt v="bodyS" color={C.ink2} style={{ flex: 1, marginBottom: 4 }}>
+                  / {fmt(k.atGrade)} keçiddə işıqlandırma OSM-də qeyd olunmayıb
                 </Txt>
               </View>
               <Txt v="bodyS" color={C.ink2}>
-                İşıqlandırma OpenStreetMap-də küçələrin yalnız {fmt(k.litTaggedPct, 1)}%-ində qeyd olunub. Qalan küçələrdə gecə riski yol sinfinə görə modelləşdirilir. İşıqlandırma
-                reyestri açılarsa, gecə qiyməti hər küçə üçün dəqiqləşər.
+                Bu keçidlərin gecə balı ehtiyatla hesablanır. Küçələrdə isə işıq qeydi uzunluğun yalnız {fmt(k.litTaggedPct, 1)}%-ində var. AI Göz ilə çəkilən hər keçid
+                işığı, zolaqları və adanı qata əlavə edir.
               </Txt>
+              <PressableScale
+                accessibilityRole="button"
+                onPress={() => router.push('/scan')}
+                style={{ alignSelf: 'flex-start', height: 42, paddingHorizontal: 16, borderRadius: 21, backgroundColor: C.ai, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Icon name="line-scan" size={18} color="#FFFFFF" />
+                <Txt w="bold" size={14} color="#FFFFFF">
+                  AI Göz ilə doldur
+                </Txt>
+              </PressableScale>
             </View>
           </Animated.View>
         ) : null}

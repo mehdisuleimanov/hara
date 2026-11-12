@@ -1,13 +1,14 @@
 /**
  * Şəhər paneli (B2G) — every number here is derived from REAL data, nothing is typed in:
- *  - LAYER (src/data/safety-layer.json): 3k+ OSM crossings with type + lanes and the
- *    day/night scores of the Bakı Təhlükəsizlik Qatı; ~20k OSM street segments with scores.
+ *  - LAYER (src/data/safety-layer.json): 3k+ OSM crossings with type, lanes, street name,
+ *    OSM evidence flags and the day/night scores of the Bakı Təhlükəsizlik Qatı (iRAP-inspired
+ *    attribute model, no random terms); ~20k OSM street segments with scores.
  *  - OSM (src/features/city/osm-city.json, scripts/build-city.mjs): OSM bus stops, metro
  *    entrances, schools, universities, malls, markets, street names and lighting-tag coverage.
  * Pedestrian demand is a MODEL (documented in demandAt), labelled as an estimate in the UI.
  * Pure functions, memoized per day/night mode.
  */
-import { LAYER } from './layer';
+import { CF, LAYER, crossingFactors, crossingStreet, type CrossingT } from './layer';
 import OSM from '@/features/city/osm-city.json';
 
 export type Mode = 'day' | 'night';
@@ -26,7 +27,21 @@ export function distM(aLat: number, aLon: number, bLat: number, bLon: number) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-const scoreOf = (c: readonly number[], mode: Mode) => (mode === 'night' ? c[4] : c[3]);
+const scoreOf = (c: CrossingT, mode: Mode) => (mode === 'night' ? c[4] : c[3]);
+
+/** OSM abbreviations → full words for display ("küç." → "küçəsi"). */
+export function niceName(n: string) {
+  return n
+    .trim()
+    .replace(/\s+küç\.?$/i, ' küçəsi')
+    .replace(/\s+pr\.?$/i, ' prospekti')
+    .replace(/\s+şos\.?$/i, ' şossesi')
+    .replace(/\s+Şosesi$/, ' şossesi');
+}
+const streetOf = (c: CrossingT) => {
+  const n = crossingStreet(c);
+  return n ? niceName(n) : placeName(c[0], c[1]);
+};
 
 // ---------------------------------------------------------------- spatial grid helper
 type Pt = { lat: number; lon: number; w: number; kind: number };
@@ -166,6 +181,9 @@ export type CityKpis = {
   types: number[];
   /** OSM lighting tag coverage: % of street length with lit=yes */
   litTaggedPct: number;
+  /** at-grade crossings whose lighting is unknown in OSM (no lit tag, no lamp nearby) */
+  noLightData: number;
+  atGrade: number;
   /** real OSM attractor counts */
   busStops: number;
   pois: number;
@@ -179,8 +197,15 @@ export function cityKpis(mode: Mode): CityKpis {
   const types = [0, 0, 0, 0];
   const bands = { safe: 0, mid: 0, risky: 0 };
   let unsigMulti = 0;
+  let noLight = 0;
+  let atGrade = 0;
   for (const c of cr) {
     types[c[2]]++;
+    if (c[2] !== T_UNDERGROUND) {
+      atGrade++;
+      const f = c[8] ?? 0;
+      if (!(f & CF.LIT_YES) && !(f & CF.LIT_NO) && !(f & CF.LAMP)) noLight++;
+    }
     if ((c[2] === T_ZEBRA || c[2] === T_UNMARKED) && c[5] >= MULTI_LANE) unsigMulti++;
     const v = scoreOf(c, mode);
     if (v >= GREEN) bands.safe++;
@@ -210,6 +235,8 @@ export function cityKpis(mode: Mode): CityKpis {
     bands,
     types,
     litTaggedPct: lit.totalKm ? (lit.litYesKm / lit.totalKm) * 100 : 0,
+    noLightData: noLight,
+    atGrade,
     busStops: (OSM.stops as number[]).length / 2,
     pois: (OSM.poi as number[]).length / 3 + LAYER.stations.length,
   };
@@ -229,6 +256,8 @@ export type RiskSpot = {
   night: number;
   score: number;
   name: string;
+  /** OSM evidence behind the score, in Azerbaijani (layer.crossingFactors) */
+  factors: string[];
   /** modelled demand, 0..1 relative to the busiest crossing */
   demand: number;
   /** real OSM bus stops / metro within 300 m */
@@ -255,21 +284,28 @@ function demandScale() {
   return _demandMax;
 }
 
-export function recommend(type: number, lanes: number, day: number, night: number, mode: Mode, stops: number): Recommendation {
+export function recommend(type: number, lanes: number, day: number, night: number, mode: Mode, stops: number, flags = 0): Recommendation {
   const drop = day - night;
   const nightNote = mode === 'night' && drop >= 10 ? ` Gecə risk gündüzdən ${drop} bal yüksəkdir.` : '';
   const flow = stops > 0 ? ` 300 m-də ${stops} dayanacaq piyada axını yaradır.` : '';
+  const island = !!(flags & CF.ISLAND);
+  if (type !== T_SIGNALS && flags & CF.SCHOOL)
+    return { title: 'Məktəb yanı: işıqfor və sürət azaldan', body: `Uşaqlar ${lanes} zolaqlı yolu işıqforsuz keçir.${flow}${nightNote}`, icon: 'school-outline' };
+  if (type === T_UNMARKED && lanes >= 6 && !island)
+    return { title: 'İşıqfor, zebra və piyada adası', body: `${lanes} zolaq bir dəfəyə, nişansız keçilir.${flow}${nightNote}`, icon: 'traffic-light-outline' };
   if (type === T_UNMARKED && lanes >= MULTI_LANE)
-    return { title: 'İşıqforlu zebra keçid tövsiyə olunur', body: `${lanes} zolaq nişansız keçilir.${flow}${nightNote}`, icon: 'traffic-light-outline' };
+    return { title: 'İşıqforlu zebra keçid', body: `${lanes} zolaq nişansız keçilir.${flow}${nightNote}`, icon: 'traffic-light-outline' };
   if (type === T_UNMARKED)
-    return { title: 'Zebra və sürət azaldan tövsiyə olunur', body: `Keçid nişanlanmayıb, sürücü piyadanı gec görür.${flow}${nightNote}`, icon: 'walk' };
-  if (type === T_ZEBRA && lanes >= 6)
-    return { title: 'İşıqfor və piyada adacığı tövsiyə olunur', body: `${lanes} zolaqlı yolda işıqforsuz zebra.${flow}${nightNote}`, icon: 'traffic-light-outline' };
+    return { title: 'Zebra və sürət azaldan', body: `Keçid nişanlanmayıb, sürücü piyadanı gec görür.${flow}${nightNote}`, icon: 'walk' };
+  if (type === T_ZEBRA && lanes >= 6 && !island)
+    return { title: 'İşıqfor və piyada adası', body: `${lanes} zolaqlı yolda işıqforsuz zebra.${flow}${nightNote}`, icon: 'traffic-light-outline' };
   if (type === T_ZEBRA && lanes >= MULTI_LANE)
-    return { title: 'Burada işıqfor tövsiyə olunur', body: `Çoxzolaqlı yolda işıqforsuz zebra: ikinci zolaqdakı sürücü piyadanı görmür.${flow}${nightNote}`, icon: 'traffic-light-outline' };
+    return { title: 'Burada işıqfor lazımdır', body: `Çoxzolaqlı yolda işıqforsuz zebra: ikinci zolaqdakı sürücü piyadanı görmür.${flow}${nightNote}`, icon: 'traffic-light-outline' };
   if (type === T_ZEBRA)
-    return { title: 'Yüksəldilmiş keçid və gecə işığı', body: `Sürəti keçiddə azaltmaq riski ən çox endirir.${flow}${nightNote}`, icon: 'lightbulb-on-outline' };
-  return { title: 'Gecə işıqlandırması gücləndirilməli', body: `İşıqforlu keçiddir, amma qaranlıqda risk artır.${flow}${nightNote}`, icon: 'lightbulb-on-outline' };
+    return { title: 'Yüksəldilmiş keçid, gecə işığı', body: `Sürəti keçiddə azaltmaq riski ən çox endirir.${flow}${nightNote}`, icon: 'lightbulb-on-outline' };
+  if (type === T_SIGNALS && lanes >= 6 && !island)
+    return { title: 'Ortada piyada adası', body: `${lanes} zolaq bir yaşıl işıqda keçilir: yaşlılar və uşaqlar çatdırmır.${flow}${nightNote}`, icon: 'island' };
+  return { title: 'Gecə işıqlandırması gücləndirilsin', body: `İşıqforlu keçiddir, amma qaranlıqda risk artır.${flow}${nightNote}`, icon: 'lightbulb-on-outline' };
 }
 
 const topCache = new Map<string, RiskSpot[]>();
@@ -303,11 +339,12 @@ export function topRisks(mode: Mode, n = 10): RiskSpot[] {
       day: c[3],
       night: c[4],
       score: scoreOf(c, mode),
-      name: placeName(c[0], c[1]),
+      name: streetOf(c),
+      factors: crossingFactors(c),
       demand: Math.min(1, crossingDemand(i) / scale),
       stops,
       metro: near[0] + near[6],
-      rec: recommend(c[2], c[5], c[3], c[4], mode, stops),
+      rec: recommend(c[2], c[5], c[3], c[4], mode, stops, c[8] ?? 0),
     });
   }
   topCache.set(key, out);
@@ -334,11 +371,12 @@ export function demandHeat() {
 }
 
 // ---------------------------------------------------------------- accessibility barriers
-export type Barrier = { lat: number; lon: number; name: string; nearestAtGradeM: number | null };
+export type Barrier = { lat: number; lon: number; name: string; nearestAtGradeM: number | null; demand: number };
 let _barriers: Barrier[] | null = null;
 /**
- * Underpasses with NO at-grade crossing (signal / zebra / unmarked) within 300 m:
- * the only way across is stairs or an escalator — no step-free option for wheelchairs
+ * Grade-separated crossings (underpass / footbridge) with NO at-grade crossing (signal /
+ * zebra / unmarked) within 300 m: the only way across is stairs, an escalator or a bridge
+ * ramp of unknown gradient — no verified step-free option for wheelchairs
  * and strollers. Sorted by how far the nearest at-grade crossing is.
  */
 export function accessBarriers(): Barrier[] {
@@ -357,16 +395,18 @@ export function accessBarriers(): Barrier[] {
     for (const p of near(g, c[0], c[1], 2)) best = Math.min(best, distM(c[0], c[1], p.lat, p.lon));
     if (best <= 300) continue;
     if (seen.some((s) => distM(s.lat, s.lon, c[0], c[1]) < 120)) continue; // one entry per underpass cluster
-    const b = { lat: c[0], lon: c[1], name: placeName(c[0], c[1]), nearestAtGradeM: Number.isFinite(best) && best < 1200 ? Math.round(best / 10) * 10 : null };
+    if (seen.some((s) => s.name === streetOf(c) && distM(s.lat, s.lon, c[0], c[1]) < 1500)) continue;
+    const b = { lat: c[0], lon: c[1], name: streetOf(c), demand: Math.min(1, demandAt(c[0], c[1]) / demandScale()), nearestAtGradeM: Number.isFinite(best) && best < 1200 ? Math.round(best / 10) * 10 : null };
     seen.push(b);
     out.push(b);
   }
-  out.sort((a, b) => (b.nearestAtGradeM ?? 9999) - (a.nearestAtGradeM ?? 9999));
+  // most pedestrians affected first (modelled demand), then the longest detour
+  out.sort((a, b) => b.demand - a.demand || (b.nearestAtGradeM ?? 9999) - (a.nearestAtGradeM ?? 9999));
   _barriers = out;
   return out;
 }
 
-export const CROSSING_LABEL = ['İşıqforlu', 'İşıqforsuz zebra', 'Nişansız', 'Yeraltı'];
+export const CROSSING_LABEL = ['İşıqforlu', 'İşıqforsuz zebra', 'Nişansız', 'Pilləkənli (yeraltı / yerüstü)'];
 
 /** Warm every cache (call after first paint). */
 export function primeCity(mode: Mode) {

@@ -18,9 +18,9 @@ export type Sample = {
 };
 
 const META: Record<SampleId, { title: string; sub: string; image: ImageSourcePropType }> = {
-  signal: { title: 'Azad Mirzəyev küçəsi', sub: 'Zebra keçid', image: require('../../../assets/scan/signal.jpg') },
-  unmarked: { title: 'Koroğlu metrosu yanı', sub: 'Geniş prospekt', image: require('../../../assets/scan/unmarked.jpg') },
-  underpass: { title: 'Mərkəz, yeraltı keçid', sub: 'Eskalatorlu giriş', image: require('../../../assets/scan/underpass.jpg') },
+  signal: { title: 'Azad Mirzəyev', sub: 'Zebra keçid', image: require('../../../assets/scan/signal.jpg') },
+  unmarked: { title: 'Koroğlu', sub: 'Geniş prospekt', image: require('../../../assets/scan/unmarked.jpg') },
+  underpass: { title: 'Yeraltı keçid', sub: 'Eskalatorlu giriş', image: require('../../../assets/scan/underpass.jpg') },
 };
 
 type Credit = { file: string; author: string; license: string; width: number; height: number };

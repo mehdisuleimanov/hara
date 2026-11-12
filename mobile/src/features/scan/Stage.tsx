@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useMemo } from 'react';
-import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
+import { StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -91,6 +91,7 @@ function BoxView({ b, i, w, h, iw, ih, base }: { b: VisionBox; i: number; w: num
   const col = boxColor(b.label);
   const dark = col === '#FFFFFF';
   const labelAbove = top > 26;
+  const alignRight = left + 130 > w; // keep the pill inside the frame
   const lite = prefs().liteFx;
   return (
     <Animated.View
@@ -102,18 +103,18 @@ function BoxView({ b, i, w, h, iw, ih, base }: { b: VisionBox; i: number; w: num
       <View
         style={{
           position: 'absolute',
-          left: -1,
-          ...(labelAbove ? { top: -24 } : { top: 3, left: 3 }),
-          paddingHorizontal: 8,
-          height: 21,
-          borderRadius: 7,
-          backgroundColor: col,
-          justifyContent: 'center',
+          width: 150,
+          flexDirection: 'row',
+          justifyContent: alignRight ? 'flex-end' : 'flex-start',
+          ...(alignRight ? { right: -1 } : { left: -1 }),
+          ...(labelAbove ? { top: -24 } : { top: 3 }),
         }}
       >
-        <Txt w="bold" size={11} color={dark ? C.navy : '#FFFFFF'} numberOfLines={1}>
-          {BOX_LABEL_AZ[b.label]}
-        </Txt>
+        <View style={{ paddingHorizontal: 8, height: 21, borderRadius: 7, backgroundColor: col, justifyContent: 'center' }}>
+          <Txt w="bold" size={11} color={dark ? C.navy : '#FFFFFF'} numberOfLines={1}>
+            {BOX_LABEL_AZ[b.label]}
+          </Txt>
+        </View>
       </View>
     </Animated.View>
   );
@@ -153,6 +154,16 @@ export function Stage({
     return () => timers.forEach(clearTimeout);
   }, [phase, boxes]);
 
+  // freeze-frame: shutter flash + the photo settles from a slight zoom
+  const flash = useSharedValue(prefs().liteFx ? 0 : 0.9);
+  const zoom = useSharedValue(prefs().liteFx ? 1 : 1.07);
+  useEffect(() => {
+    flash.value = withTiming(0, { duration: 420 });
+    zoom.value = withTiming(1, { duration: 650, easing: Easing.out(Easing.cubic) });
+  }, [flash, zoom]);
+  const zoomStyle = useAnimatedStyle(() => ({ transform: [{ scale: zoom.value }] }));
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
+
   const dim = useSharedValue(0);
   useEffect(() => {
     dim.value = withTiming(phase === 'scan' ? 0.32 : phase === 'guide' ? 0.5 : 0.08, { duration: 360 });
@@ -161,7 +172,7 @@ export function Stage({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Image source={source} resizeMode="cover" style={StyleSheet.absoluteFill} />
+      <Animated.Image source={source} resizeMode="cover" style={[{ position: 'absolute', left: 0, top: 0, width: w, height: h }, zoomStyle]} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: C.navy }, dimStyle]} />
       {phase === 'scan' ? (
         <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(250)} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -169,6 +180,7 @@ export function Stage({
         </Animated.View>
       ) : null}
       <Beam h={h} active={phase === 'scan'} />
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF' }, flashStyle]} />
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {ordered.map(({ b, i }) => (
           <BoxView key={`${i}-${b.label}`} b={b} i={i} w={w} h={h} iw={iw} ih={ih} base={120} />
