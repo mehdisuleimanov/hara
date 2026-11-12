@@ -137,7 +137,7 @@ export function scoreWalk(layer: LayerData, walks: number[][]): WalkScore {
   const M = SCORE_MODEL;
   const ix = indexOf(layer);
   let walkM = 0;
-  const crossedOrder: { i: number; at: number }[] = [];
+  const crossedOrder: { i: number; at: number; d: number }[] = [];
   const segLen = new Map<number, number>();
   let sumD = 0, sumN = 0, sumL = 0;
 
@@ -200,13 +200,31 @@ export function scoreWalk(layer: LayerData, walks: number[][]): WalkScore {
           crossed = diff >= M.minAngle;
         }
       }
-      if (crossed) crossedOrder.push({ i: idx, at: offset + at });
+      if (crossed) crossedOrder.push({ i: idx, at: offset + at, d: best.get(idx)!.d });
     }
     offset += pts.length;
   }
 
-  crossedOrder.sort((a, b) => a.at - b.at);
-  const crossed = crossedOrder.map((x) => x.i);
+  // one physical road is crossed once: at junctions OSM often maps a crossing node per arm/side,
+  // so crossings of the same street (same name, similar axis) within 30 m collapse to the closest
+  const kept = crossedOrder.filter((x) => {
+    const cx = layer.crossings[x.i];
+    return !crossedOrder.some((y) => {
+      if (y === x) return false;
+      const cy = layer.crossings[y.i];
+      if (distM(cx[0], cx[1], cy[0], cy[1]) > 30) return false;
+      if ((cx[7] ?? -1) !== (cy[7] ?? -1)) return false;
+      const ax = cx[6] ?? -1, ay = cy[6] ?? -1;
+      if (ax >= 0 && ay >= 0) {
+        let diff = Math.abs(ax - ay) % 180;
+        if (diff > 90) diff = 180 - diff;
+        if (diff > 25) return false;
+      }
+      return y.d < x.d || (y.d === x.d && y.i < x.i);
+    });
+  });
+  kept.sort((a, b) => a.at - b.at);
+  const crossed = kept.map((x) => x.i);
   const signals = crossed.filter((i) => layer.crossings[i][2] === 0 || layer.crossings[i][2] === 3).length;
   const unsignalized = crossed.length - signals;
   const riskyDay = crossed.filter((i) => layer.crossings[i][3] < M.riskyBelow).length;

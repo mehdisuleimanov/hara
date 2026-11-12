@@ -19,6 +19,7 @@
 //   maxspeed missing→ class default (trunk 70, primary/secondary 60, tertiary 50, residential 40)
 //   lit missing     → night penalty sits between lit=yes and lit=no (unless a street lamp ≤30 m)
 //   crossing type   → an untyped `highway=crossing` counts as UNMARKED
+//   no public road  → crossing on a service road / parking aisle: 2 lanes, 30 km/h, unverified
 //
 // CROSSING  day = BASE[facility]
 //                 − LANE_W[f] × max(0, lanes − 2)          exposure time in the carriageway
@@ -333,10 +334,11 @@ async function main() {
   for (const { c, road, type } of pre) {
     const t = c.tags;
     const info = road?.info;
-    const cls = info?.cls ?? 'tertiary';
+    // no public road (trunk…residential) within 14 m → the crossing sits on a service road /
+    // parking aisle / driveway (not in the road extract): 2 lanes, 30 km/h, unverified
     const lanes = info?.lanes ?? 2;
     const lanesVerified = info?.lanesVerified ?? false;
-    const speed = info?.speed ?? DEFAULT_SPEED.tertiary;
+    const speed = info?.speed ?? 30;
     let lit = t.lit === 'yes' || info?.lit === 'yes' ? 'yes' : t.lit === 'no' || info?.lit === 'no' ? 'no' : 'unknown';
     if (lit === 'unknown' && lamps.near(c.lat, c.lon, 30).length) lit = 'yes';
     const island = t['crossing:island'] === 'yes';
