@@ -16,6 +16,7 @@ import { FeatureGrid } from './FeatureGrid';
 import { RiskInsight } from './RiskInsight';
 import { RecentPlaces } from './RecentPlaces';
 import { TopFade } from './TopFade';
+import { SuggestionCard } from './SuggestionCard';
 import { USER_NAME, ahmedLine, greeting, nearbyReports } from './context';
 import { upperAz } from '@/features/a11y/text';
 
@@ -107,6 +108,11 @@ export function StandardHome() {
           </PressableScale>
         </ScrollView>
       </Animated.View>
+
+      {/* proactive tip */}
+      <View style={{ marginTop: 14 }}>
+        <SuggestionCard night={night} base={3} />
+      </View>
 
       {/* features */}
       <Animated.View entering={enter(3)} style={styles.section}>
