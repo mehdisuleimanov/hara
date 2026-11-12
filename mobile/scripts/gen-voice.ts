@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allLines } from '../src/voice/lines/index';
 import { lineKey } from '../src/voice/key';
-import { b64ToBytes, pcmToWav } from '../src/voice/wav';
+import { b64ToBytes, compressPauses, pcmToWav } from '../src/voice/wav';
 
 const ROOT = path.resolve(__dirname, '..');
 const env: Record<string, string> = {};
@@ -31,9 +31,9 @@ const arg = (k: string) => {
   const i = args.indexOf(k);
   return i >= 0 ? args[i + 1] : undefined;
 };
-const VOICE = arg('--voice') || env.EXPO_PUBLIC_GEMINI_VOICE || 'Charon';
+const VOICE = arg('--voice') || env.EXPO_PUBLIC_GEMINI_VOICE || 'Achird';
 const FORCE = args.includes('--force');
-const STYLE = 'Read aloud in a warm, calm, friendly male voice, in natural North Azerbaijani (Baku accent), at a relaxed pace:';
+const STYLE = 'Read aloud in a warm, calm, friendly male voice, in natural North Azerbaijani (Baku accent), at a natural conversational pace — not slow, no long pauses:';
 
 async function tts(text: string, voice: string): Promise<Uint8Array> {
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -57,7 +57,7 @@ async function tts(text: string, voice: string): Promise<Uint8Array> {
     const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
     if (!part) throw new Error('no audio: ' + JSON.stringify(j).slice(0, 300));
     const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? '')?.[1] ?? 24000);
-    return pcmToWav(b64ToBytes(part.inlineData.data), rate);
+    return pcmToWav(compressPauses(b64ToBytes(part.inlineData.data), rate), rate);
   }
   throw new Error('retries exhausted');
 }

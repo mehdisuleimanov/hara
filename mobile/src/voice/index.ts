@@ -9,7 +9,7 @@ import { log } from '@/utils/log';
 import { CLIPS } from './clips.generated';
 import { initDeviceVoice, speakDevice, stopDevice } from './device';
 import { lineKey } from './key';
-import { b64ToBytes, pcmToWav } from './wav';
+import { b64ToBytes, compressPauses, pcmToWav } from './wav';
 
 /**
  * Əhməd's voice. Lookup order: bundled clip → cached WAV → live Gemini TTS → device TTS.
@@ -70,7 +70,7 @@ async function synth(text: string, timeoutMs: number) {
   if (!f) return null;
   if (f.exists) return f.uri;
   const { pcmB64, rate } = await geminiTts(text, { timeoutMs });
-  const wav = pcmToWav(b64ToBytes(pcmB64), rate);
+  const wav = pcmToWav(compressPauses(b64ToBytes(pcmB64), rate), rate);
   f.create({ overwrite: true });
   f.write(wav);
   return f.uri;

@@ -195,7 +195,7 @@ export async function runToolLoop(opts: {
  */
 export async function geminiTts(text: string, opts: { voice?: string; style?: string; timeoutMs?: number } = {}): Promise<{ pcmB64: string; rate: number }> {
   if (!GEMINI_KEY) throw new GeminiError('NO_KEY');
-  const prompt = `${opts.style ?? 'Say in a warm, calm, friendly voice, in Azerbaijani:'} ${text}`;
+  const prompt = `${opts.style ?? 'Say in a warm, friendly male voice, in natural North Azerbaijani, at a natural conversational pace (not slow):'} ${text}`;
   const json = await post(
     GEMINI_TTS_MODEL,
     {
@@ -214,4 +214,4 @@ export async function geminiTts(text: string, opts: { voice?: string; style?: st
   return { pcmB64: part.inlineData.data, rate };
 }
 
-export const DEFAULT_VOICE = process.env.EXPO_PUBLIC_GEMINI_VOICE || 'Charon';
+export const DEFAULT_VOICE = process.env.EXPO_PUBLIC_GEMINI_VOICE || 'Achird';

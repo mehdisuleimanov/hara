@@ -19,6 +19,35 @@ export function b64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+/**
+ * Shortens long silent pauses in PCM16 mono (keeps natural rhythm, removes dead air).
+ * Silence = 20 ms windows with RMS < threshold; runs longer than maxPauseMs are cut to maxPauseMs.
+ */
+export function compressPauses(pcm: Uint8Array, rate = 24000, maxPauseMs = 280, threshold = 300): Uint8Array {
+  const n = Math.floor(pcm.length / 2);
+  const view = new DataView(pcm.buffer, pcm.byteOffset, n * 2);
+  const win = Math.max(1, Math.floor(rate / 50));
+  const keepWins = Math.max(1, Math.round(maxPauseMs / 20));
+  const out = new Uint8Array(pcm.length);
+  let o = 0;
+  let silentRun = 0;
+  for (let i = 0; i < n; i += win) {
+    const end = Math.min(n, i + win);
+    let sum = 0;
+    for (let j = i; j < end; j++) {
+      const v = view.getInt16(j * 2, true);
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / (end - i));
+    const silent = rms < threshold;
+    silentRun = silent ? silentRun + 1 : 0;
+    if (silent && silentRun > keepWins) continue;
+    out.set(pcm.subarray(i * 2, end * 2), o);
+    o += (end - i) * 2;
+  }
+  return out.slice(0, o);
+}
+
 export function pcmToWav(pcm: Uint8Array, rate = 24000, channels = 1, bits = 16): Uint8Array {
   const header = new ArrayBuffer(44);
   const v = new DataView(header);
