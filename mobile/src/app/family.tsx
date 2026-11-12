@@ -19,6 +19,7 @@ import { makeTrack, pointAt, regionFor, toLatLngs } from '@/utils/geo';
 import { triggerFamilyArrival } from '@/utils/notify';
 import { say } from '@/voice';
 import { BRAND } from '@/voice/lines/brand';
+import { useMarkerSnapshot } from '@/features/brand/useMarkerSnapshot';
 import { C, R, shadow } from '@/theme';
 
 const PRICE = '3,99 ₼';
@@ -214,6 +215,7 @@ function Dashboard() {
   const [notifyArrival, setNotifyArrival] = useState(true);
   const [sos, setSos] = useState(false);
   const fired = useRef(false);
+  const trackMarkers = useMarkerSnapshot();
   const notifyRef = useRef(notifyArrival);
   notifyRef.current = notifyArrival;
 
@@ -293,17 +295,17 @@ function Dashboard() {
             <Polyline coordinates={murad} strokeColor={C.brand} strokeWidth={5} lineCap="round" />
             <Polyline coordinates={nene.pts} strokeColor={C.halo} strokeWidth={14} lineCap="round" />
             <Polyline coordinates={nene.pts} strokeColor={C.route} strokeWidth={5.5} lineCap="round" lineJoin="round" />
-            <Marker coordinate={{ latitude: f.home.lat, longitude: f.home.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <Marker coordinate={{ latitude: f.home.lat, longitude: f.home.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={trackMarkers}>
               <View style={[styles.place, { backgroundColor: C.navy }]}>
                 <Icon name="home-variant" size={16} color="#FFFFFF" />
               </View>
             </Marker>
-            <Marker coordinate={{ latitude: f.school.lat, longitude: f.school.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <Marker coordinate={{ latitude: f.school.lat, longitude: f.school.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={trackMarkers}>
               <View style={[styles.place, { backgroundColor: C.brand }]}>
                 <Icon name="school" size={16} color="#FFFFFF" />
               </View>
             </Marker>
-            <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={30}>
+            <Marker coordinate={pos} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={trackMarkers} zIndex={30}>
               <View style={styles.neneDot}>
                 <Txt w="xbold" size={13} color="#FFFFFF">
                   N

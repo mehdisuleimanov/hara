@@ -17,6 +17,7 @@ import { regionFor, toLatLngs } from '@/utils/geo';
 import { useWeather } from '@/utils/weather';
 import { say, stop } from '@/voice';
 import { BRAND } from '@/voice/lines/brand';
+import { useMarkerSnapshot } from '@/features/brand/useMarkerSnapshot';
 import { C, R, shadow } from '@/theme';
 
 /**
@@ -74,6 +75,7 @@ export default function Scooter() {
   const { speak: speakParam } = useLocalSearchParams<{ speak?: string }>();
   const insets = useSafeAreaInsets();
   const w = useWind();
+  const trackMarkers = useMarkerSnapshot(900, `${w.speed > SEAFRONT_WIND_LIMIT}${w.gust > GUST_LIMIT}`);
   const s = ROUTES.scooter;
   const sea = useMemo(() => toLatLngs(s.seafront.c), [s]);
   const calm = useMemo(() => toLatLngs(s.calm.c), [s]);
@@ -190,7 +192,7 @@ export default function Scooter() {
                 <Polyline coordinates={chosen} strokeColor={C.halo} strokeWidth={15} zIndex={3} lineCap="round" />
                 <Polyline coordinates={chosen} strokeColor={C.route} strokeWidth={6} zIndex={4} lineCap="round" lineJoin="round" />
                 {mid ? (
-                  <Marker coordinate={mid} anchor={{ x: 0.5, y: 1.2 }} tracksViewChanges={false}>
+                  <Marker coordinate={mid} anchor={{ x: 0.5, y: 1.2 }} tracksViewChanges={trackMarkers}>
                     <View style={styles.label}>
                       <Txt w="bold" size={12.5} color="#FFFFFF">
                         {useCalm ? 'Daxili küçələr' : 'Dənizkənarı'} · {chosenMin} dəq
@@ -199,7 +201,7 @@ export default function Scooter() {
                   </Marker>
                 ) : null}
                 {otherMid && useCalm ? (
-                  <Marker coordinate={otherMid} anchor={{ x: 0.5, y: -0.3 }} tracksViewChanges={false}>
+                  <Marker coordinate={otherMid} anchor={{ x: 0.5, y: -0.3 }} tracksViewChanges={trackMarkers}>
                     <View style={[styles.label, { backgroundColor: C.dangerSoft }]}>
                       <Txt w="bold" size={12} color={C.danger}>
                         Dənizkənarı · qarşı külək

@@ -164,6 +164,7 @@ export default function LockScreenPreview() {
                   mapType="standard"
                   customMapStyle={MAP_STYLE}
                   liteMode
+                  toolbarEnabled={false}
                   region={{
                     latitude: pos?.latitude ?? route[0].latitude,
                     longitude: pos?.longitude ?? route[0].longitude,

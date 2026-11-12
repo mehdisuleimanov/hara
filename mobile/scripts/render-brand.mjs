@@ -1,4 +1,4 @@
-// Renders the app icon, Android adaptive icon layers, splash mark and favicon from the
+// Renders the app icon, Android adaptive icon layers and favicon from the
 // team's own logo (assets/brand/hara-logo.svg + the map-line art of hara-logo-original.svg).
 // Usage: node scripts/render-brand.mjs   (writes assets/*.png; dev-time only)
 import fs from 'node:fs';
@@ -78,16 +78,9 @@ function write(file, svgText, size) {
   write('android-icon-monochrome.png', svg(S, logo({ cx: S / 2, cy: S / 2, width: fgW, mono: WHITE, faceOnly: true })), S);
 }
 
-/* ---------- 3. splash mark: navy disc + logo (fits Android 12's circular icon mask), on white */
-{
-  const S = 1024;
-  const r = S * 0.46;
-  const defs = `${navyGradient('bg')}<clipPath id="disc"><circle cx="${S / 2}" cy="${S / 2}" r="${r}"/></clipPath>`;
-  const body = `<g clip-path="url(#disc)"><rect width="${S}" height="${S}" fill="url(#bg)"/>${mapLines(S, 1.0)}</g>${logo({ cx: S / 2, cy: S / 2, width: r * 2 * 0.66, halo: 14 })}`;
-  write('splash-icon.png', svg(S, body, defs), S);
-}
+/* (the native splash image is owned elsewhere — not rendered here) */
 
-/* ---------- 4. favicon: rounded navy tile */
+/* ---------- 3. favicon: rounded navy tile */
 {
   const S = 196;
   const body = `<rect width="${S}" height="${S}" rx="${S * 0.24}" fill="url(#bg)"/>${logo({ cx: S / 2, cy: S / 2, width: S * 0.78, halo: 3 })}`;
