@@ -2,49 +2,94 @@
 // Maps lineKey(text) → bundled Azerbaijani clip (Gemini TTS, voice Achird).
 /* eslint-disable */
 export const CLIPS: Record<string, number> = {
+  '0604d18c': require('../../assets/voice/0604d18c.wav'), // Sadə rejim açıldı. Yazılar böyükdür, düymələr rahatdır.
   '06a13d9b': require('../../assets/voice/06a13d9b.wav'), // Port Baku üçün ən az riskli yol: taksi, təxminən 4 ilə 6 manat arası, 7 dəqiqə.
+  '08ef2118': require('../../assets/voice/08ef2118.wav'), // Bu yeri hələ tanımıram. Ünvanı bir az dəqiq de, ya da yaxınlıqdakı tanınmış yeri
   '0a2e24a2': require('../../assets/voice/0a2e24a2.wav'), // Gənclik Mall üçün ən sərfəli yol pulsuzdur: 3150 metr piyada, 42 dəqiqə. Amma di
+  '0da1fc94': require('../../assets/voice/0da1fc94.wav'), // Bir az sola dön.
   '15c220a2': require('../../assets/voice/15c220a2.wav'), // Düşmə nöqtəsini dəyişdim. İndi giriş elə sənin tərəfindədir.
   '1ce8bdda': require('../../assets/voice/1ce8bdda.wav'), // Alov Qüllələri üçün ən sərfəli yol pulsuzdur: 3910 metr piyada, 51 dəqiqə. Amma 
+  '1e1f905c': require('../../assets/voice/1e1f905c.wav'), // Diqqət, taksi səni qarşı tərəfdə düşürəcək. Birbaşa keçmə, səni ən yaxın yeraltı
   '1fed156e': require('../../assets/voice/1fed156e.wav'), // Gecədir, ona görə Bulvar üçün ən az riskli yolu seçdim: metro ilə 2 dayanacaq, s
   '206e6020': require('../../assets/voice/206e6020.wav'), // Hiltona ən az riskli yolu hazırlayıram.
   '2275f2be': require('../../assets/voice/2275f2be.wav'), // Universitet üçün ən tez yol taksidir: 10 dəqiqə, təxminən 5 ilə 7 manat arası.
+  '2329989a': require('../../assets/voice/2329989a.wav'), // Az qaldı, demək olar ki, çatdın.
   '292836b7': require('../../assets/voice/292836b7.wav'), // Salam! Mən Əhmədəm. Bakıda hara getsən, ən az riskli yolu birlikdə tapaq.
+  '2992f917': require('../../assets/voice/2992f917.wav'), // Növbəti stansiyada düşürsən.
+  '2a9c3543': require('../../assets/voice/2a9c3543.wav'), // Müşayiət sifariş edildi. Əməkdaş səni lift qarşısında gözləyəcək.
+  '2f103348': require('../../assets/voice/2f103348.wav'), // Yaxşı, səni evə aparıram. Mən yanındayam.
+  '325178fc': require('../../assets/voice/325178fc.wav'), // Sağ ol! Bildirişin yoldan keçənləri qoruyacaq.
+  '35e1731b': require('../../assets/voice/35e1731b.wav'), // Hara gedirsən?
   '3d5e957b': require('../../assets/voice/3d5e957b.wav'), // Hara getmək istədiyini de: məsələn, Hilton, İçərişəhər və ya Gənclik Mall.
+  '3e70c862': require('../../assets/voice/3e70c862.wav'), // Geri dön.
   '42d43700': require('../../assets/voice/42d43700.wav'), // Nizami metrosu üçün ən sərfəli yol pulsuzdur: 2060 metr piyada, 27 dəqiqə. Amma 
   '451bb781': require('../../assets/voice/451bb781.wav'), // İçərişəhər üçün ən sərfəli yol pulsuzdur: 2780 metr piyada, 37 dəqiqə. Amma diqq
+  '48b57723': require('../../assets/voice/48b57723.wav'), // Bir az sağa dön.
+  '499d5921': require('../../assets/voice/499d5921.wav'), // Gecədir, ona görə Port Baku üçün ən az riskli yolu seçdim: taksi, təxminən 4 ilə
+  '51213fc4': require('../../assets/voice/51213fc4.wav'), // 80 metr sonra işıqforsuz keçid var. Səni işıqforlu keçidə yönləndirirəm.
+  '534bd448': require('../../assets/voice/534bd448.wav'), // Ən qısa yol həmişə ən yaxşısı deyil. Mən işıqforlu keçidi seçirəm.
   '542ed2d5': require('../../assets/voice/542ed2d5.wav'), // Hilton üçün ən az riskli yol: metro ilə 1 dayanacaq, sonra 610 metr piyada, cəmi
   '596a53e8': require('../../assets/voice/596a53e8.wav'), // Nizami metrosu üçün ən tez yol metro ilə 1 dayanacaq, 7 dəqiqə.
   '5b64e919': require('../../assets/voice/5b64e919.wav'), // Nizami metrosu üçün ən az riskli yol: metro ilə 1 dayanacaq, cəmi 7 dəqiqə. Taks
+  '5ce63640': require('../../assets/voice/5ce63640.wav'), // Mikrofona icazə olmadan səni eşidə bilmirəm. Yazaraq da soruşa bilərsən.
+  '5d38504d': require('../../assets/voice/5d38504d.wav'), // Keçidi yaxşı görə bilmədim. Keçidi kadrın ortasına al və yenidən çək.
+  '61308134': require('../../assets/voice/61308134.wav'), // Səsini eşitdim. Bunun hansı növ olduğunu seç.
+  '650f6555': require('../../assets/voice/650f6555.wav'), // Kimə zəng edək?
+  '66371f43': require('../../assets/voice/66371f43.wav'), // Salam! Mən Əhmədəm. Hara getmək istəyirsən? Düyməyə toxun və danış.
   '66d2b343': require('../../assets/voice/66d2b343.wav'), // Taksi səni yolun qarşı tərəfində düşürür. Birbaşa keçmə, işıqforlu keçiddən keç.
+  '6ef963e0': require('../../assets/voice/6ef963e0.wav'), // Gecədir, ona görə Hilton üçün ən az riskli yolu seçdim: metro ilə 1 dayanacaq, s
+  '729e12eb': require('../../assets/voice/729e12eb.wav'), // Nənənin evinə ən az riskli yolu hazırlayıram.
+  '776959a0': require('../../assets/voice/776959a0.wav'), // 80 metr sonra nişansız keçid var. Səni işıqforlu keçidə yönləndirirəm.
   '7d72e425': require('../../assets/voice/7d72e425.wav'), // Gecədir, ona görə Alov Qüllələri üçün ən az riskli yolu seçdim: taksi, təxminən 
   '7ddf8ab3': require('../../assets/voice/7ddf8ab3.wav'), // Bu gün külək çox güclüdür, skuter riskli olar. Metro ilə getməyi məsləhət görürə
   '7efd51a6': require('../../assets/voice/7efd51a6.wav'), // Evə ən tez yol taksidir: 22 dəqiqə, təxminən 12 ilə 14 manat arası.
   '834c6f97': require('../../assets/voice/834c6f97.wav'), // Hilton üçün ən sərfəli yol pulsuzdur: 1210 metr piyada, 16 dəqiqə. Amma diqqət: 
   '8a3f9f57': require('../../assets/voice/8a3f9f57.wav'), // Universitet üçün ən sərfəli yol pulsuzdur: 3170 metr piyada, 42 dəqiqə. Amma diq
+  '8b2ccde1': require('../../assets/voice/8b2ccde1.wav'), // Düz davam et.
   '8d7a7043': require('../../assets/voice/8d7a7043.wav'), // İçərişəhər üçün ən az riskli yol: metro ilə 2 dayanacaq, cəmi 9 dəqiqə. Taksi il
   '911bfeb8': require('../../assets/voice/911bfeb8.wav'), // Gənclik Mall üçün ən az riskli yol: metro ilə 1 dayanacaq, sonra 100 metr piyada
   '91941bec': require('../../assets/voice/91941bec.wav'), // Bağışla, səsini aydın eşitmədim. Bir də de, ya da aşağıdan seç.
+  '91c52d1e': require('../../assets/voice/91c52d1e.wav'), // Görünüş. Yazıların ölçüsünü və rəngini seç.
   '91ddc637': require('../../assets/voice/91ddc637.wav'), // Alov Qüllələri üçün ən az riskli yol: taksi, təxminən 6 ilə 8 manat arası, 12 də
+  '96cef8a9': require('../../assets/voice/96cef8a9.wav'), // Növbəti döngədə sola dön.
   '96cfb3da': require('../../assets/voice/96cfb3da.wav'), // İçərişəhər üçün ən tez yol metro ilə 2 dayanacaq, 9 dəqiqə.
+  '97c69d2f': require('../../assets/voice/97c69d2f.wav'), // Port Baku üçün ən tez yol taksidir: 7 dəqiqə, təxminən 4 ilə 6 manat arası. Diqq
   '97fd448b': require('../../assets/voice/97fd448b.wav'), // Bulvar üçün ən tez yol taksidir: 11 dəqiqə, təxminən 5 ilə 7 manat arası.
   '9882a03a': require('../../assets/voice/9882a03a.wav'), // Taksi səni Neftçilər prospektinin qarşı tərəfində düşürür: 4 zolaq, işıqforsuz, 
+  '98adf7e7': require('../../assets/voice/98adf7e7.wav'), // Taksiyə otur. Düşmə nöqtəsini mən izləyirəm.
+  '9aad4a3b': require('../../assets/voice/9aad4a3b.wav'), // Bulvar üçün ən az riskli yol: metro ilə 2 dayanacaq, sonra 1150 metr piyada, cəm
   'a8a896f4': require('../../assets/voice/a8a896f4.wav'), // Bunu dəqiq deyə bilmərəm. Hara getmək istədiyini de, ən az riskli yolu göstərim.
+  'ab6fc991': require('../../assets/voice/ab6fc991.wav'), // Standart görünüşə qayıtdıq.
+  'ad2d1b70': require('../../assets/voice/ad2d1b70.wav'), // Növbəti dayanacaqda düşürsən.
   'ae9b3c6d': require('../../assets/voice/ae9b3c6d.wav'), // Çatdın! Yaxşı yol oldu.
   'b06a33a7': require('../../assets/voice/b06a33a7.wav'), // Gecədir, ona görə Gənclik Mall üçün ən az riskli yolu seçdim: metro ilə 1 dayana
   'b483e6ee': require('../../assets/voice/b483e6ee.wav'), // Hilton üçün ən tez yol taksidir: 8 dəqiqə, təxminən 4 ilə 6 manat arası. Diqqət:
   'b6e41f83': require('../../assets/voice/b6e41f83.wav'), // Evə ən sərfəli yol 60 qəpik: 360 metr piyada, sonra 46 nömrəli avtobusla, sonra 
   'bb5ce803': require('../../assets/voice/bb5ce803.wav'), // Gənclik Mall üçün ən tez yol metro ilə 1 dayanacaq, sonra 100 metr piyada, 8 dəq
+  'bcbaec87': require('../../assets/voice/bcbaec87.wav'), // Gecədir, ona görə evə ən az riskli yolu seçdim: metro ilə 8 dayanacaq, sonra 230
+  'c2da1281': require('../../assets/voice/c2da1281.wav'), // Avtobusa min. Dayanacaqları sənin üçün sayıram.
   'c4b6990d': require('../../assets/voice/c4b6990d.wav'), // Axşamın xeyir! Mən Əhmədəm. Hara gedirik?
+  'c87bc593': require('../../assets/voice/c87bc593.wav'), // Bu kadrda keçid görmədim. Kameranı yola tut ki, keçid kadrın ortasında olsun.
+  'ca3c9587': require('../../assets/voice/ca3c9587.wav'), // Yüksək kontrast açıldı. İndi hər şey daha aydın görünür.
+  'd0fc3fea': require('../../assets/voice/d0fc3fea.wav'), // Hər yazıya toxunsan, onu səsli oxuyacağam.
   'd985a25d': require('../../assets/voice/d985a25d.wav'), // Salam! Mən Əhmədəm. Hara gedirik?
   'dab3da1a': require('../../assets/voice/dab3da1a.wav'), // Gecədir, ona görə İçərişəhər üçün ən az riskli yolu seçdim: metro ilə 2 dayanaca
   'de817602': require('../../assets/voice/de817602.wav'), // Gecədir, ona görə Universitet üçün ən az riskli yolu seçdim: metro ilə 1 dayanac
+  'e470c49f': require('../../assets/voice/e470c49f.wav'), // Bulvar üçün ən sərfəli yol pulsuzdur: 2590 metr piyada, 34 dəqiqə.
   'e5867324': require('../../assets/voice/e5867324.wav'), // Evə ən az riskli yol: metro ilə 8 dayanacaq, sonra 230 metr piyada, cəmi 26 dəqi
   'e59b79bc': require('../../assets/voice/e59b79bc.wav'), // Yeni düşmə nöqtəsini sürücüyə göndərdim.
+  'e885a626': require('../../assets/voice/e885a626.wav'), // Metroya min. Stansiyaları sənin üçün sayıram.
+  'eb7934cb': require('../../assets/voice/eb7934cb.wav'), // Metrodan çıx. Yolun qalanı piyadadır.
   'ed020daa': require('../../assets/voice/ed020daa.wav'), // Yola düşdük. Ən az riskli yolla gedirik.
+  'f97fb883': require('../../assets/voice/f97fb883.wav'), // Evə ən az riskli yolu hazırlayıram.
   'f9f0d6a7': require('../../assets/voice/f9f0d6a7.wav'), // Universitet üçün ən az riskli yol: metro ilə 1 dayanacaq, sonra 630 metr piyada,
+  'fb8ac000': require('../../assets/voice/fb8ac000.wav'), // Sadə rejim açıldı. Mən yanındayam.
   'fc274d7d': require('../../assets/voice/fc274d7d.wav'), // Bir saniyə, ən az riskli yolu yoxlayıram.
+  'fd5f99b2': require('../../assets/voice/fd5f99b2.wav'), // Gecədir, ona görə Nizami metrosu üçün ən az riskli yolu seçdim: metro ilə 1 daya
+  'fd800cc4': require('../../assets/voice/fd800cc4.wav'), // Bağlantı bir az zəifdir. Bir azdan yenidən çək, ya da nümunələrdən birini seç.
+  'fec5b4a2': require('../../assets/voice/fec5b4a2.wav'), // Port Baku üçün ən sərfəli yol pulsuzdur: 1400 metr piyada, 18 dəqiqə. Amma diqqə
   'ff11f98b': require('../../assets/voice/ff11f98b.wav'), // Bir az uzun de, səni dinləyirəm.
+  'ff548724': require('../../assets/voice/ff548724.wav'), // Alov Qüllələri üçün ən tez yol taksidir: 12 dəqiqə, təxminən 6 ilə 8 manat arası
   'ffe96e96': require('../../assets/voice/ffe96e96.wav'), // Növbəti döngədə sağa dön.
 };
 export const CLIP_VOICE = 'Achird';

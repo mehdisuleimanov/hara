@@ -48,6 +48,60 @@ export function compressPauses(pcm: Uint8Array, rate = 24000, maxPauseMs = 280, 
   return out.slice(0, o);
 }
 
+/**
+ * Newer Gemini TTS models return a complete WAV file instead of raw PCM. Wrapping that again made the
+ * inner header click at the start and its trailing metadata (LIST chunk) crackle at the end.
+ * Returns only the PCM samples (and the real sample rate if a header was found).
+ */
+export function extractPcm(bytes: Uint8Array, rate = 24000): { pcm: Uint8Array; rate: number } {
+  const tag = (o: number) => String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]);
+  const u32 = (o: number) => (bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) | (bytes[o + 3] << 24)) >>> 0;
+  if (bytes.length > 12 && tag(0) === 'RIFF' && tag(8) === 'WAVE') {
+    let o = 12;
+    let r = rate;
+    while (o + 8 <= bytes.length) {
+      const id = tag(o);
+      const size = u32(o + 4);
+      if (id === 'fmt ') r = u32(o + 12) || r;
+      if (id === 'data') {
+        const end = Math.min(bytes.length, o + 8 + (size || bytes.length));
+        return { pcm: stripTrailer(bytes.subarray(o + 8, end - ((end - o - 8) % 2))), rate: r };
+      }
+      o += 8 + size + (size % 2);
+    }
+  }
+  return { pcm: stripTrailer(bytes), rate };
+}
+
+/** Cuts a trailing metadata chunk (C2PA content credentials, LIST, ID3) that would play as noise. */
+function stripTrailer(pcm: Uint8Array): Uint8Array {
+  const from = Math.max(0, pcm.length - 65536);
+  for (let o = from; o + 4 <= pcm.length; o++) {
+    const a = pcm[o];
+    if (a !== 0x43 && a !== 0x4c && a !== 0x69 && a !== 0x49) continue; // C L i I
+    const t = String.fromCharCode(a, pcm[o + 1], pcm[o + 2], pcm[o + 3]);
+    if (t === 'C2PA' || t === 'LIST' || t === 'id3 ' || t === 'ID3 ') return pcm.subarray(0, o - (o % 2));
+  }
+  return pcm;
+}
+
+/** Short fade-in/out and a little trailing silence so playback starts and ends without a click. */
+export function cleanEdges(pcm: Uint8Array, rate = 24000): Uint8Array {
+  const n = Math.floor(pcm.length / 2);
+  const view = new DataView(pcm.buffer, pcm.byteOffset, n * 2);
+  const fade = Math.min(Math.floor(n / 2), Math.floor(rate * 0.012));
+  const pad = Math.floor(rate * 0.08);
+  const out = new Uint8Array((n + pad) * 2);
+  const ov = new DataView(out.buffer);
+  for (let k = 0; k < n; k++) {
+    let v = view.getInt16(k * 2, true);
+    if (k < fade) v = Math.round((v * k) / fade);
+    if (n - k < fade) v = Math.round((v * (n - k)) / fade);
+    ov.setInt16(k * 2, v, true);
+  }
+  return out;
+}
+
 export function pcmToWav(pcm: Uint8Array, rate = 24000, channels = 1, bits = 16): Uint8Array {
   const header = new ArrayBuffer(44);
   const v = new DataView(header);

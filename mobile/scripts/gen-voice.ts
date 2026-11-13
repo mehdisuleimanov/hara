@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allLines } from '../src/voice/lines/index';
 import { lineKey } from '../src/voice/key';
-import { b64ToBytes, compressPauses, pcmToWav } from '../src/voice/wav';
+import { b64ToBytes, cleanEdges, compressPauses, extractPcm, pcmToWav } from '../src/voice/wav';
 
 const ROOT = path.resolve(__dirname, '..');
 const env: Record<string, string> = {};
@@ -78,7 +78,8 @@ async function ttsOnce(text: string, voice: string, key: string, model: string):
     return null;
   }
   const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? '')?.[1] ?? 24000);
-  return pcmToWav(compressPauses(b64ToBytes(part.inlineData.data), rate), rate);
+  const ex = extractPcm(b64ToBytes(part.inlineData.data), rate);
+  return pcmToWav(cleanEdges(compressPauses(ex.pcm, ex.rate), ex.rate), ex.rate);
 }
 
 /** Tries the preferred key first, then every other key/model; retries network errors. */

@@ -9,7 +9,7 @@ import { log } from '@/utils/log';
 import { CLIPS } from './clips.generated';
 import { initDeviceVoice, speakDevice, stopDevice } from './device';
 import { lineKey } from './key';
-import { b64ToBytes, compressPauses, pcmToWav } from './wav';
+import { b64ToBytes, cleanEdges, compressPauses, extractPcm, pcmToWav } from './wav';
 
 /**
  * Əhməd's voice. Lookup order: bundled clip → cached WAV → live Gemini TTS → device TTS.
@@ -63,7 +63,7 @@ async function cacheFile(key: string) {
   if (Platform.OS === 'web') return null;
   const { Directory, File, Paths } = await import('expo-file-system');
   // v2: clips synthesized before the plain-text prompt fix are ignored
-  const dir = new Directory(Paths.cache, 'voice-v2');
+  const dir = new Directory(Paths.cache, 'voice-v3');
   if (!dir.exists) dir.create({ intermediates: true });
   return new File(dir, `${key}.wav`);
 }
@@ -74,7 +74,8 @@ async function synth(text: string, timeoutMs: number) {
   if (!f) return null;
   if (f.exists) return f.uri;
   const { pcmB64, rate } = await geminiTts(text, { timeoutMs });
-  const wav = pcmToWav(compressPauses(b64ToBytes(pcmB64), rate), rate);
+  const { pcm, rate: r } = extractPcm(b64ToBytes(pcmB64), rate);
+  const wav = pcmToWav(cleanEdges(compressPauses(pcm, r), r), r);
   f.create({ overwrite: true });
   f.write(wav);
   return f.uri;
