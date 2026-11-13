@@ -20,7 +20,7 @@ try {
   }
 } catch {}
 const KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || env.EXPO_PUBLIC_GEMINI_API_KEY;
-const MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-lite-tts';
+const MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
 if (!KEY) {
   console.error('No EXPO_PUBLIC_GEMINI_API_KEY in mobile/.env');
   process.exit(1);
@@ -35,29 +35,51 @@ const VOICE = arg('--voice') || env.EXPO_PUBLIC_GEMINI_VOICE || 'Achird';
 const FORCE = args.includes('--force');
 const STYLE = 'Speak quickly and warmly, like a friendly young Baku guide — fast conversational pace, short pauses. Language: North Azerbaijani. Text:';
 
-async function tts(text: string, voice: string): Promise<Uint8Array> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY! },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: `${STYLE} ${text}` }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-        },
-      }),
-    });
-    if (res.status === 429 || res.status >= 500) {
-      await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
-      continue;
+// All keys (free tier quotas are per project): main + GEMINI_API_KEY1..9
+const KEYS = [KEY!, ...Array.from({ length: 9 }, (_, i) => process.env[`GEMINI_API_KEY${i + 1}`] || env[`GEMINI_API_KEY${i + 1}`]).filter(Boolean)] as string[];
+const MODELS = [MODEL, 'gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'].filter((m, i, a) => a.indexOf(m) === i);
+const dead = new Set<string>(); // `${key}|${model}` exhausted for today
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function ttsOnce(text: string, voice: string, key: string, model: string): Promise<Uint8Array | 'quota' | null> {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: `${STYLE} ${text}` }] }],
+      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+    }),
+  });
+  const j: any = await res.json().catch(() => ({}));
+  if (res.status === 429) return /PerDay/i.test(JSON.stringify(j)) ? 'quota' : null;
+  if (!res.ok) {
+    if (res.status >= 500) return null;
+    throw new Error(`HTTP ${res.status}: ${JSON.stringify(j).slice(0, 200)}`);
+  }
+  const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
+  if (!part) return null;
+  const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? '')?.[1] ?? 24000);
+  return pcmToWav(compressPauses(b64ToBytes(part.inlineData.data), rate), rate);
+}
+
+/** Tries the preferred key first, then every other key/model; retries network errors. */
+async function tts(text: string, voice: string, prefer = 0): Promise<Uint8Array> {
+  for (let round = 0; round < 25; round++) {
+    for (const model of MODELS) {
+      for (let i = 0; i < KEYS.length; i++) {
+        const key = KEYS[(prefer + i) % KEYS.length];
+        if (dead.has(`${key}|${model}`)) continue;
+        try {
+          const r = await ttsOnce(text, voice, key, model);
+          if (r === 'quota') { dead.add(`${key}|${model}`); continue; }
+          if (r) return r;
+        } catch (e) {
+          if (!/fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket/i.test(String((e as any)?.cause ?? e))) throw e;
+        }
+        await sleep(1500);
+      }
     }
-    const j: any = await res.json();
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(j).slice(0, 300)}`);
-    const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
-    if (!part) throw new Error('no audio: ' + JSON.stringify(j).slice(0, 300));
-    const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? '')?.[1] ?? 24000);
-    return pcmToWav(compressPauses(b64ToBytes(part.inlineData.data), rate), rate);
+    await sleep(20000);
   }
   throw new Error('retries exhausted');
 }
@@ -80,20 +102,30 @@ async function main() {
   const lines = allLines();
   const map: Record<string, string> = {};
   let made = 0;
+  const todo: string[] = [];
   for (const line of lines) {
     const k = lineKey(line);
-    const file = path.join(outDir, `${k}.wav`);
     map[k] = line;
-    if (!FORCE && fs.existsSync(file)) continue;
-    try {
-      const wav = await tts(line, VOICE);
-      fs.writeFileSync(file, wav);
-      made++;
-      console.log(`✓ ${k} ${(wav.length / 1024).toFixed(0)}KB  ${line.slice(0, 70)}`);
-    } catch (e) {
-      console.error(`✗ ${k} ${line.slice(0, 60)} → ${String(e).slice(0, 200)}`);
-    }
+    if (FORCE || !fs.existsSync(path.join(outDir, `${k}.wav`))) todo.push(line);
   }
+  console.log(`keys: ${KEYS.length}, lines to make: ${todo.length}`);
+  let next = 0;
+  await Promise.all(
+    KEYS.map(async (_, w) => {
+      while (next < todo.length) {
+        const line = todo[next++];
+        const k = lineKey(line);
+        try {
+          const wav = await tts(line, VOICE, w);
+          fs.writeFileSync(path.join(outDir, `${k}.wav`), wav);
+          made++;
+          console.log(`✓ [${w}] ${k} ${(wav.length / 1024).toFixed(0)}KB  ${line.slice(0, 60)}`);
+        } catch (e) {
+          console.error(`✗ ${k} ${line.slice(0, 50)} → ${String(e).slice(0, 160)}`);
+        }
+      }
+    }),
+  );
   // regenerate the clip map from files that exist
   const entries = Object.keys(map)
     .filter((k) => fs.existsSync(path.join(outDir, `${k}.wav`)))

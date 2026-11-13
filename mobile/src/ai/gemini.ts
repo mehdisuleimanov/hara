@@ -9,7 +9,7 @@ import { log } from '@/utils/log';
 
 export const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 export const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.1-flash-lite';
-export const GEMINI_TTS_MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-lite-tts';
+export const GEMINI_TTS_MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
 const FALLBACK_MODELS = ['gemini-3.5-flash-lite'];
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 

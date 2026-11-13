@@ -43,3 +43,6 @@ yarn-error.*
 # local env (Gemini key)
 .env
 .env*.local
+
+# local TTS voice A/B samples
+scripts/.voice-ab/
