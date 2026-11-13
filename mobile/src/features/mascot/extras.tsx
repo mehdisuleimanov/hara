@@ -49,7 +49,7 @@ export function AhmedWalker({ progress, width, size = 56 }: { progress: SharedVa
     if (typeof progress === 'number') numeric.value = progress;
   }, [progress, numeric]);
   const src = typeof progress === 'number' ? numeric : progress;
-  const x = useSharedValue(Math.min(1, Math.max(0, src.value)) * track);
+  const x = useSharedValue(-1);
   const pose = useSharedValue(IDLE);
   const phase = useSharedValue(0);
   const facing = useSharedValue(1);
@@ -58,6 +58,7 @@ export function AhmedWalker({ progress, width, size = 56 }: { progress: SharedVa
     'worklet';
     const dt = Math.min(0.05, (fi.timeSincePreviousFrame ?? 16) / 1000);
     const target = Math.min(1, Math.max(0, src.value)) * track;
+    if (x.value < 0) x.value = target;
     const nx = x.value + (target - x.value) * (1 - Math.exp(-dt / 0.35));
     const dx = nx - x.value;
     x.value = nx;
@@ -73,7 +74,7 @@ export function AhmedWalker({ progress, width, size = 56 }: { progress: SharedVa
       if (still.value > 0.25) pose.value = IDLE;
     }
   });
-  const st = useAnimatedStyle(() => ({ transform: [{ translateX: x.value - charW * 0.1 }] }));
+  const st = useAnimatedStyle(() => ({ opacity: x.value < 0 ? 0 : 1, transform: [{ translateX: Math.max(0, x.value) - charW * 0.1 }] }));
   return (
     <View style={{ width, height: size, overflow: 'visible' }}>
       <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, st]}>

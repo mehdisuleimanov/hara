@@ -196,8 +196,9 @@ function animatePose(i: number, v: number[], tau: number, t: number, inp: RigInp
       v[ROOT_Y] += 1.6 * s * s;
       v[BODY_Y] -= 1.4 * c * c;
       v[BODY_R] += 1.5 * s;
-      v[AL] = 14 + 20 * s;
-      v[AR] = 14 + 20 * s;
+      // pendulum swing (same screen rotation for both arms reads best in 3/4 view)
+      v[AL] = 16 + 18 * s;
+      v[AR] = 16 - 18 * s;
       v[AL + 1] = -20;
       v[AR + 1] = -20;
       v[CAP_R] += 1.5 * S(ph * 2 + 0.6);

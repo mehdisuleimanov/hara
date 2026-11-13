@@ -180,7 +180,7 @@ function Face() {
   const wob = useAnimatedStyle(() => ({ opacity: g2.value[Q.wob] }));
   const open = useAnimatedStyle(() => {
     const o = g1.value[O.open];
-    return { opacity: o > 0.03 ? 1 : 0, transform: jt(s, CX, MOUTH_TOP, 0, 0, 0, g1.value[O.wide], Math.max(0.02, o)) };
+    return { opacity: o > 0.1 ? 1 : 0, transform: jt(s, CX, MOUTH_TOP, 0, 0, 0, g1.value[O.wide], Math.max(0.1, o)) };
   });
   const oo = useAnimatedStyle(() => {
     const o = g1.value[O.o];
