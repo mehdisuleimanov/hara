@@ -2,6 +2,7 @@
 // Maps lineKey(text) → bundled Azerbaijani clip (Gemini TTS, voice Achird).
 /* eslint-disable */
 export const CLIPS: Record<string, number> = {
+  '03a2eeec': require('../../assets/voice/03a2eeec.wav'), // Burada əsas risk eskalatorun əlil arabası üçün uyğun olmamasıdır. Yolu keçmək üç
   '0604d18c': require('../../assets/voice/0604d18c.wav'), // Sadə rejim açıldı. Yazılar böyükdür, düymələr rahatdır.
   '06a13d9b': require('../../assets/voice/06a13d9b.wav'), // Port Baku üçün ən az riskli yol: taksi, təxminən 4 ilə 6 manat arası, 7 dəqiqə.
   '08ef2118': require('../../assets/voice/08ef2118.wav'), // Bu yeri hələ tanımıram. Ünvanı bir az dəqiq de, ya da yaxınlıqdakı tanınmış yeri
@@ -12,6 +13,7 @@ export const CLIPS: Record<string, number> = {
   '1e1f905c': require('../../assets/voice/1e1f905c.wav'), // Diqqət, taksi səni qarşı tərəfdə düşürəcək. Birbaşa keçmə, səni ən yaxın yeraltı
   '1fed156e': require('../../assets/voice/1fed156e.wav'), // Gecədir, ona görə Bulvar üçün ən az riskli yolu seçdim: metro ilə 2 dayanacaq, s
   '206e6020': require('../../assets/voice/206e6020.wav'), // Hiltona ən az riskli yolu hazırlayıram.
+  '21c016c7': require('../../assets/voice/21c016c7.wav'), // Burada piyada keçidi yoxdur və avtomobillər çox sürətlə hərəkət edir. Yolu keçmə
   '2275f2be': require('../../assets/voice/2275f2be.wav'), // Universitet üçün ən tez yol taksidir: 10 dəqiqə, təxminən 5 ilə 7 manat arası.
   '2329989a': require('../../assets/voice/2329989a.wav'), // Az qaldı, demək olar ki, çatdın.
   '292836b7': require('../../assets/voice/292836b7.wav'), // Salam! Mən Əhmədəm. Bakıda hara getsən, ən az riskli yolu birlikdə tapaq.
@@ -39,7 +41,9 @@ export const CLIPS: Record<string, number> = {
   '66d2b343': require('../../assets/voice/66d2b343.wav'), // Taksi səni yolun qarşı tərəfində düşürür. Birbaşa keçmə, işıqforlu keçiddən keç.
   '6ef963e0': require('../../assets/voice/6ef963e0.wav'), // Gecədir, ona görə Hilton üçün ən az riskli yolu seçdim: metro ilə 1 dayanacaq, s
   '729e12eb': require('../../assets/voice/729e12eb.wav'), // Nənənin evinə ən az riskli yolu hazırlayıram.
+  '7597d9ec': require('../../assets/voice/7597d9ec.wav'), // Təşəkkürlər! Bu keçid Təhlükəsizlik Qatına əlavə olundu.
   '776959a0': require('../../assets/voice/776959a0.wav'), // 80 metr sonra nişansız keçid var. Səni işıqforlu keçidə yönləndirirəm.
+  '78aeb6ca': require('../../assets/voice/78aeb6ca.wav'), // Burada avtomobil sıxlığı yüksəkdir və işıqfor yoxdur. Yolu keçərkən diqqətli ol,
   '7d72e425': require('../../assets/voice/7d72e425.wav'), // Gecədir, ona görə Alov Qüllələri üçün ən az riskli yolu seçdim: taksi, təxminən 
   '7ddf8ab3': require('../../assets/voice/7ddf8ab3.wav'), // Bu gün külək çox güclüdür, skuter riskli olar. Metro ilə getməyi məsləhət görürə
   '7efd51a6': require('../../assets/voice/7efd51a6.wav'), // Evə ən tez yol taksidir: 22 dəqiqə, təxminən 12 ilə 14 manat arası.
