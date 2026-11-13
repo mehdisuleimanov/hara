@@ -464,7 +464,7 @@ export function Ahmed({
         accessible
         accessibilityRole={interactive ? 'button' : 'image'}
         accessibilityLabel="Əhməd"
-        style={{ width: box[2] * s, height: box[3] * s, overflow: crop === 'head' ? 'hidden' : 'visible' }}
+        style={{ width: box[2] * s, height: box[3] * s, overflow: crop === 'full' ? 'visible' : 'hidden' }}
         {...responder}
       >
         <View pointerEvents="none" style={{ position: 'absolute', left: -box[0] * s, top: -box[1] * s, width: W * s, height: H * s }}>
