@@ -9,7 +9,7 @@ import { log } from '@/utils/log';
 
 export const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 export const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.1-flash-lite';
-export const GEMINI_TTS_MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
+export const GEMINI_TTS_MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-lite-tts';
 const FALLBACK_MODELS = ['gemini-3.5-flash-lite'];
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -195,7 +195,7 @@ export async function runToolLoop(opts: {
  */
 export async function geminiTts(text: string, opts: { voice?: string; style?: string; timeoutMs?: number } = {}): Promise<{ pcmB64: string; rate: number }> {
   if (!GEMINI_KEY) throw new GeminiError('NO_KEY');
-  const prompt = `${opts.style ?? 'Say in a warm, friendly male voice, in natural North Azerbaijani, at a natural conversational pace (not slow):'} ${text}`;
+  const prompt = `${opts.style ?? 'Speak quickly and warmly, like a friendly young Baku guide — fast conversational pace, short pauses. Language: North Azerbaijani. Text:'} ${text}`;
   const json = await post(
     GEMINI_TTS_MODEL,
     {

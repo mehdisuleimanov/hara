@@ -60,7 +60,7 @@ export function optionOf(destId: string, kind: RouteKind) {
 }
 
 export const KIND_TITLE: Record<RouteKind, string> = {
-  safest: 'Ən təhlükəsiz',
+  safest: 'Ən az riskli',
   cheapest: 'Ən sərfəli',
   fastest: 'Ən sürətli',
 };

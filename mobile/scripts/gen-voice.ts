@@ -20,7 +20,7 @@ try {
   }
 } catch {}
 const KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || env.EXPO_PUBLIC_GEMINI_API_KEY;
-const MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
+const MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-lite-tts';
 if (!KEY) {
   console.error('No EXPO_PUBLIC_GEMINI_API_KEY in mobile/.env');
   process.exit(1);
@@ -33,7 +33,7 @@ const arg = (k: string) => {
 };
 const VOICE = arg('--voice') || env.EXPO_PUBLIC_GEMINI_VOICE || 'Achird';
 const FORCE = args.includes('--force');
-const STYLE = 'Read aloud in a warm, calm, friendly male voice, in natural North Azerbaijani (Baku accent), at a natural conversational pace — not slow, no long pauses:';
+const STYLE = 'Speak quickly and warmly, like a friendly young Baku guide — fast conversational pace, short pauses. Language: North Azerbaijani. Text:';
 
 async function tts(text: string, voice: string): Promise<Uint8Array> {
   for (let attempt = 0; attempt < 4; attempt++) {

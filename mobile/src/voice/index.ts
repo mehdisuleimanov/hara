@@ -32,6 +32,9 @@ export const VOICE_RECORDING: RecordingOptions = {
   web: { mimeType: 'audio/webm', bitsPerSecond: 32000 },
 } as RecordingOptions;
 
+/** Playback speed for Əhməd's clips (pitch-corrected). */
+const PLAYBACK_RATE = 1.15;
+
 let player: AudioPlayer | null = null;
 let sub: { remove: () => void } | null = null;
 let seq = 0;
@@ -85,6 +88,11 @@ function play(source: number | string, my: number, src: VoiceSource, text: strin
     sub = player.addListener('playbackStatusUpdate', (s: { didJustFinish?: boolean }) => {
       if (s.didJustFinish) finish(my);
     });
+    try {
+      // Achird (lite TTS) speaks slowly; a gentle pitch-corrected speed-up sounds natural
+      (player as unknown as { shouldCorrectPitch: boolean }).shouldCorrectPitch = true;
+      player.setPlaybackRate(PLAYBACK_RATE, 'high');
+    } catch {}
     useVoiceStore.setState({ speaking: true, source: src, text });
     player.play();
     onStart?.();

@@ -55,7 +55,7 @@ jobs:
           NODE_ENV: production
           EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EXPO_PUBLIC_GEMINI_MODEL: gemini-3.1-flash-lite
-          EXPO_PUBLIC_GEMINI_TTS_MODEL: gemini-3.8-flash-tts
+          EXPO_PUBLIC_GEMINI_TTS_MODEL: gemini-3.8-flash-lite-tts
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
 
       - name: Rename APK
