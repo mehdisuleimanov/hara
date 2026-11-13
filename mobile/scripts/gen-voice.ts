@@ -51,13 +51,24 @@ async function ttsOnce(text: string, voice: string, key: string, model: string):
     }),
   });
   const j: any = await res.json().catch(() => ({}));
-  if (res.status === 429) return /PerDay/i.test(JSON.stringify(j)) ? 'quota' : null;
+  if (res.status === 429) {
+    const details: any[] = j?.error?.details ?? [];
+    const ids = details.flatMap((d) => d?.violations ?? []).map((v: any) => String(v?.quotaId ?? ''));
+    if (ids.some((id) => /PerDay/i.test(id))) return 'quota';
+    const delay = Number(/(\d+(?:\.\d+)?)s/.exec(details.find((d) => d?.retryDelay)?.retryDelay ?? '')?.[1] ?? 20);
+    console.warn(`  · per-minute limit (${model}), waiting ${Math.ceil(delay)}s`);
+    await sleep(Math.min(65, delay) * 1000 + 500);
+    return null;
+  }
   if (!res.ok) {
     if (res.status >= 500) return null;
     throw new Error(`HTTP ${res.status}: ${JSON.stringify(j).slice(0, 200)}`);
   }
   const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
-  if (!part) return null;
+  if (!part) {
+    console.warn(`  · no audio (${model}, finish=${j?.candidates?.[0]?.finishReason})`);
+    return null;
+  }
   const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? '')?.[1] ?? 24000);
   return pcmToWav(compressPauses(b64ToBytes(part.inlineData.data), rate), rate);
 }
@@ -65,6 +76,7 @@ async function ttsOnce(text: string, voice: string, key: string, model: string):
 /** Tries the preferred key first, then every other key/model; retries network errors. */
 async function tts(text: string, voice: string, prefer = 0): Promise<Uint8Array> {
   for (let round = 0; round < 25; round++) {
+    if (KEYS.every((k) => MODELS.every((m) => dead.has(`${k}|${m}`)))) throw new Error('all daily quotas used');
     for (const model of MODELS) {
       for (let i = 0; i < KEYS.length; i++) {
         const key = KEYS[(prefer + i) % KEYS.length];
@@ -108,11 +120,21 @@ async function main() {
     map[k] = line;
     if (FORCE || !fs.existsSync(path.join(outDir, `${k}.wav`))) todo.push(line);
   }
-  console.log(`keys: ${KEYS.length}, lines to make: ${todo.length}`);
+  // --first k1,k2,…  → make these line keys first (demo-critical lines)
+  const first = (arg('--first') ?? '').split(',').filter(Boolean);
+  todo.sort((a, b) => {
+    const ia = first.indexOf(lineKey(a));
+    const ib = first.indexOf(lineKey(b));
+    return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib);
+  });
+  // --serial → one request at a time (free tier has tight per-minute limits)
+  const workers = args.includes('--serial') ? [0] : KEYS.map((_, w) => w);
+  console.log(`keys: ${KEYS.length}, lines to make: ${todo.length}, workers: ${workers.length}`);
   let next = 0;
+  let stopAll = false;
   await Promise.all(
-    KEYS.map(async (_, w) => {
-      while (next < todo.length) {
+    workers.map(async (w) => {
+      while (next < todo.length && !stopAll) {
         const line = todo[next++];
         const k = lineKey(line);
         try {
@@ -122,6 +144,7 @@ async function main() {
           console.log(`✓ [${w}] ${k} ${(wav.length / 1024).toFixed(0)}KB  ${line.slice(0, 60)}`);
         } catch (e) {
           console.error(`✗ ${k} ${line.slice(0, 50)} → ${String(e).slice(0, 160)}`);
+          if (/all daily quotas used/.test(String(e))) stopAll = true;
         }
       }
     }),

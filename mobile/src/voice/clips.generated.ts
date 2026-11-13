@@ -6,6 +6,7 @@ export const CLIPS: Record<string, number> = {
   '08ef2118': require('../../assets/voice/08ef2118.wav'), // Bu yeri hələ tanımıram. Ünvanı bir az dəqiq de, ya da yaxınlıqdakı tanınmış yeri
   '0a2e24a2': require('../../assets/voice/0a2e24a2.wav'), // Gənclik Mall üçün ən sərfəli yol pulsuzdur: 3150 metr piyada, 42 dəqiqə. Amma di
   '1ce8bdda': require('../../assets/voice/1ce8bdda.wav'), // Alov Qüllələri üçün ən sərfəli yol pulsuzdur: 3910 metr piyada, 51 dəqiqə. Amma 
+  '1e1f905c': require('../../assets/voice/1e1f905c.wav'), // Diqqət, taksi səni qarşı tərəfdə düşürəcək. Birbaşa keçmə, səni ən yaxın yeraltı
   '1fed156e': require('../../assets/voice/1fed156e.wav'), // Gecədir, ona görə Bulvar üçün ən az riskli yolu seçdim: metro ilə 2 dayanacaq, s
   '2275f2be': require('../../assets/voice/2275f2be.wav'), // Universitet üçün ən tez yol taksidir: 10 dəqiqə, təxminən 5 ilə 7 manat arası.
   '3d5e957b': require('../../assets/voice/3d5e957b.wav'), // Hara getmək istədiyini de: məsələn, Hilton, İçərişəhər və ya Gənclik Mall.
@@ -17,14 +18,17 @@ export const CLIPS: Record<string, number> = {
   '5b64e919': require('../../assets/voice/5b64e919.wav'), // Nizami metrosu üçün ən az riskli yol: metro ilə 1 dayanacaq, cəmi 7 dəqiqə. Taks
   '5ce63640': require('../../assets/voice/5ce63640.wav'), // Mikrofona icazə olmadan səni eşidə bilmirəm. Yazaraq da soruşa bilərsən.
   '6ef963e0': require('../../assets/voice/6ef963e0.wav'), // Gecədir, ona görə Hilton üçün ən az riskli yolu seçdim: metro ilə 1 dayanacaq, s
+  '776959a0': require('../../assets/voice/776959a0.wav'), // 80 metr sonra nişansız keçid var. Səni işıqforlu keçidə yönləndirirəm.
   '7d72e425': require('../../assets/voice/7d72e425.wav'), // Gecədir, ona görə Alov Qüllələri üçün ən az riskli yolu seçdim: taksi, təxminən 
   '7ddf8ab3': require('../../assets/voice/7ddf8ab3.wav'), // Bu gün külək çox güclüdür, skuter riskli olar. Metro ilə getməyi məsləhət görürə
+  '7efd51a6': require('../../assets/voice/7efd51a6.wav'), // Evə ən tez yol taksidir: 22 dəqiqə, təxminən 12 ilə 14 manat arası.
   '834c6f97': require('../../assets/voice/834c6f97.wav'), // Hilton üçün ən sərfəli yol pulsuzdur: 1210 metr piyada, 16 dəqiqə. Amma diqqət: 
   '8a3f9f57': require('../../assets/voice/8a3f9f57.wav'), // Universitet üçün ən sərfəli yol pulsuzdur: 3170 metr piyada, 42 dəqiqə. Amma diq
   '8d7a7043': require('../../assets/voice/8d7a7043.wav'), // İçərişəhər üçün ən az riskli yol: metro ilə 2 dayanacaq, cəmi 9 dəqiqə. Taksi il
   '911bfeb8': require('../../assets/voice/911bfeb8.wav'), // Gənclik Mall üçün ən az riskli yol: metro ilə 1 dayanacaq, sonra 100 metr piyada
   '91941bec': require('../../assets/voice/91941bec.wav'), // Bağışla, səsini aydın eşitmədim. Bir də de, ya da aşağıdan seç.
   '91ddc637': require('../../assets/voice/91ddc637.wav'), // Alov Qüllələri üçün ən az riskli yol: taksi, təxminən 6 ilə 8 manat arası, 12 də
+  '96cef8a9': require('../../assets/voice/96cef8a9.wav'), // Növbəti döngədə sola dön.
   '96cfb3da': require('../../assets/voice/96cfb3da.wav'), // İçərişəhər üçün ən tez yol metro ilə 2 dayanacaq, 9 dəqiqə.
   '97c69d2f': require('../../assets/voice/97c69d2f.wav'), // Port Baku üçün ən tez yol taksidir: 7 dəqiqə, təxminən 4 ilə 6 manat arası. Diqq
   '97fd448b': require('../../assets/voice/97fd448b.wav'), // Bulvar üçün ən tez yol taksidir: 11 dəqiqə, təxminən 5 ilə 7 manat arası.
@@ -41,6 +45,7 @@ export const CLIPS: Record<string, number> = {
   'dab3da1a': require('../../assets/voice/dab3da1a.wav'), // Gecədir, ona görə İçərişəhər üçün ən az riskli yolu seçdim: metro ilə 2 dayanaca
   'de817602': require('../../assets/voice/de817602.wav'), // Gecədir, ona görə Universitet üçün ən az riskli yolu seçdim: metro ilə 1 dayanac
   'e470c49f': require('../../assets/voice/e470c49f.wav'), // Bulvar üçün ən sərfəli yol pulsuzdur: 2590 metr piyada, 34 dəqiqə.
+  'e5867324': require('../../assets/voice/e5867324.wav'), // Evə ən az riskli yol: metro ilə 8 dayanacaq, sonra 230 metr piyada, cəmi 26 dəqi
   'ed020daa': require('../../assets/voice/ed020daa.wav'), // Yola düşdük. Ən az riskli yolla gedirik.
   'f9f0d6a7': require('../../assets/voice/f9f0d6a7.wav'), // Universitet üçün ən az riskli yol: metro ilə 1 dayanacaq, sonra 630 metr piyada,
   'fc274d7d': require('../../assets/voice/fc274d7d.wav'), // Bir saniyə, ən az riskli yolu yoxlayıram.
@@ -48,5 +53,6 @@ export const CLIPS: Record<string, number> = {
   'fec5b4a2': require('../../assets/voice/fec5b4a2.wav'), // Port Baku üçün ən sərfəli yol pulsuzdur: 1400 metr piyada, 18 dəqiqə. Amma diqqə
   'ff11f98b': require('../../assets/voice/ff11f98b.wav'), // Bir az uzun de, səni dinləyirəm.
   'ff548724': require('../../assets/voice/ff548724.wav'), // Alov Qüllələri üçün ən tez yol taksidir: 12 dəqiqə, təxminən 6 ilə 8 manat arası
+  'ffe96e96': require('../../assets/voice/ffe96e96.wav'), // Növbəti döngədə sağa dön.
 };
 export const CLIP_VOICE = 'Achird';

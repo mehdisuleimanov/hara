@@ -8,9 +8,16 @@
 import { log } from '@/utils/log';
 
 export const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+/** Optional extra keys (comma-separated). Used in turn when a key hits its daily quota. */
+const GEMINI_KEYS = [GEMINI_KEY, ...(process.env.EXPO_PUBLIC_GEMINI_API_KEYS ?? '').split(',').map((k: string) => k.trim())].filter(
+  (k, i, a) => !!k && a.indexOf(k) === i,
+);
 export const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.1-flash-lite';
 export const GEMINI_TTS_MODEL = process.env.EXPO_PUBLIC_GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
+const TTS_MODELS = [GEMINI_TTS_MODEL, 'gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'].filter((m, i, a) => a.indexOf(m) === i);
 const FALLBACK_MODELS = ['gemini-3.5-flash-lite'];
+/** `${keyIndex}|${model}` pairs that hit a daily quota this session. */
+const exhausted = new Set<string>();
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export type GeminiErrorCode = 'NO_KEY' | 'OFFLINE' | 'TIMEOUT' | 'HTTP_4XX' | 'HTTP_5XX' | 'PARSE' | 'EMPTY';
@@ -40,26 +47,35 @@ export type FunctionDecl = {
 
 let thinkingSupported = true;
 
+/** POST to one model; on a daily-quota 429 moves on to the next key within the same deadline. */
 async function post(model: string, body: object, timeoutMs: number): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    let res: Response;
-    try {
-      res = await fetch(`${BASE}/${model}:generateContent`, {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
-        body: JSON.stringify(body),
-      });
-    } catch (e) {
-      throw new GeminiError(ctrl.signal.aborted ? 'TIMEOUT' : 'OFFLINE', String(e));
-    }
-    if (!res.ok) {
+    let lastErr: GeminiError | null = null;
+    for (let k = 0; k < GEMINI_KEYS.length; k++) {
+      if (exhausted.has(`${k}|${model}`)) continue;
+      let res: Response;
+      try {
+        res = await fetch(`${BASE}/${model}:generateContent`, {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEYS[k] },
+          body: JSON.stringify(body),
+        });
+      } catch (e) {
+        throw new GeminiError(ctrl.signal.aborted ? 'TIMEOUT' : 'OFFLINE', String(e));
+      }
+      if (res.ok) return await res.json();
       const text = await res.text().catch(() => '');
-      throw new GeminiError(res.status >= 500 ? 'HTTP_5XX' : 'HTTP_4XX', `HTTP_${res.status}: ${text.slice(0, 300)}`, res.status);
+      lastErr = new GeminiError(res.status >= 500 ? 'HTTP_5XX' : 'HTTP_4XX', `HTTP_${res.status}: ${text.slice(0, 300)}`, res.status);
+      if (res.status === 429 && /PerDay/i.test(text)) {
+        exhausted.add(`${k}|${model}`);
+        continue;
+      }
+      throw lastErr;
     }
-    return await res.json();
+    throw lastErr ?? new GeminiError('HTTP_4XX', `HTTP_429: all keys exhausted for ${model}`, 429);
   } finally {
     clearTimeout(timer);
   }
@@ -196,22 +212,34 @@ export async function runToolLoop(opts: {
 export async function geminiTts(text: string, opts: { voice?: string; style?: string; timeoutMs?: number } = {}): Promise<{ pcmB64: string; rate: number }> {
   if (!GEMINI_KEY) throw new GeminiError('NO_KEY');
   const prompt = `${opts.style ?? 'Speak quickly and warmly, like a friendly young Baku guide — fast conversational pace, short pauses. Language: North Azerbaijani. Text:'} ${text}`;
-  const json = await post(
-    GEMINI_TTS_MODEL,
-    {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseModalities: ['AUDIO'],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: opts.voice ?? DEFAULT_VOICE } } },
-      },
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: opts.voice ?? DEFAULT_VOICE } } },
     },
-    opts.timeoutMs ?? 8000,
-  );
-  const part = json?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
-  if (!part) throw new GeminiError('EMPTY');
-  const mime: string = part.inlineData.mimeType ?? '';
-  const rate = Number(/rate=(\d+)/.exec(mime)?.[1] ?? 24000);
-  return { pcmB64: part.inlineData.data, rate };
+  };
+  const deadline = Date.now() + (opts.timeoutMs ?? 8000);
+  let lastErr: unknown;
+  // same voice on every TTS model: when one model's quota is used up, the next one speaks
+  for (const model of TTS_MODELS) {
+    const left = deadline - Date.now();
+    if (left < 800) break;
+    try {
+      const json = await post(model, body, left);
+      const part = json?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
+      if (!part) throw new GeminiError('EMPTY');
+      const mime: string = part.inlineData.mimeType ?? '';
+      const rate = Number(/rate=(\d+)/.exec(mime)?.[1] ?? 24000);
+      return { pcmB64: part.inlineData.data, rate };
+    } catch (e) {
+      lastErr = e;
+      log(`[tts] ${model} failed: ${String(e).slice(0, 120)}`);
+      if (e instanceof GeminiError && (e.code === 'OFFLINE' || e.code === 'TIMEOUT')) break;
+    }
+  }
+  if (lastErr instanceof GeminiError) throw lastErr;
+  throw new GeminiError('TIMEOUT', String(lastErr ?? 'deadline'));
 }
 
 export const DEFAULT_VOICE = process.env.EXPO_PUBLIC_GEMINI_VOICE || 'Achird';
