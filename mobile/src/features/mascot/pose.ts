@@ -90,6 +90,19 @@ export const KEY_POSES: Record<string, PoseP> = {
     mouth: { smile: 0, open: 0.82, wide: 0.92 },
     armL: { sh: 50, el: 58, wr: -24, hand: 'open' },
   }),
+  listen: make({
+    body: { rot: 5, sx: 1.015, sy: 1.015 },
+    look: [0.35, -0.1],
+    brow: { ly: -2.5, ry: -3, rr: -4 },
+    mouth: { smile: 0.6, o: 0.45 },
+    armR: { sh: 150, el: 21, wr: -30, hand: 'mitten' },
+  }),
+  walk: make({
+    body: { rot: 4 },
+    look: [0.75, 0.05],
+    armL: { sh: 14, el: -20, wr: 0, hand: 'mitten' },
+    armR: { sh: 14, el: -20, wr: 0, hand: 'mitten' },
+  }),
   think: make({
     body: { rot: 3 },
     look: [0.75, -0.85],
