@@ -211,7 +211,8 @@ export async function runToolLoop(opts: {
  */
 export async function geminiTts(text: string, opts: { voice?: string; style?: string; timeoutMs?: number } = {}): Promise<{ pcmB64: string; rate: number }> {
   if (!GEMINI_KEY) throw new GeminiError('NO_KEY');
-  const prompt = `${opts.style ?? 'Speak quickly and warmly, like a friendly young Baku guide — fast conversational pace, short pauses. Language: North Azerbaijani. Text:'} ${text}`;
+  // Plain text only by default: TTS models sometimes read a style instruction aloud.
+  const prompt = opts.style ? `${opts.style} ${text}` : text;
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {

@@ -80,6 +80,11 @@ export default function AhmedScreen() {
   const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recStart = useRef(0);
   const scrollRef = useRef<ScrollViewInstance>(null);
+  /** hands-free conversation: on after the user speaks; the mic reopens when Əhməd finishes answering */
+  const convo = useRef(false);
+  const [followUp, setFollowUp] = useState(false);
+  const textModeRef = useRef(textMode);
+  textModeRef.current = textMode;
 
   const recorder = useAudioRecorder(VOICE_RECORDING);
   const voice = useVoice();
@@ -188,6 +193,12 @@ export default function AhmedScreen() {
         },
         onDone: () => {
           if (navigates && !started && my === runId.current) scheduleOpen(r, 2200);
+          // conversation mode: a question/clarification keeps the dialogue going — reopen the mic
+          if (!navigates && convo.current && my === runId.current && !leaving.current && !textModeRef.current) {
+            setTimeout(() => {
+              if (my === runId.current && !leaving.current && phaseRef.current === 'answer') startListening({ followUp: true });
+            }, 450);
+          }
         },
       });
     };
@@ -268,8 +279,11 @@ export default function AhmedScreen() {
   }, [params.demo, params.q]);
 
   // ---------- voice capture ----------
-  const startListening = async () => {
+  const startListening = async (o: { followUp?: boolean } = {}) => {
     if (busy.current) return;
+    convo.current = true;
+    setFollowUp(!!o.followUp);
+    if (o.followUp) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     stop();
     if (handoffTimer.current) clearTimeout(handoffTimer.current);
     setHandoffMs(null);
@@ -331,7 +345,17 @@ export default function AhmedScreen() {
     }
   };
 
+  /** no speech after the mic opened: close it quietly and leave conversation mode */
+  const noSpeech = async () => {
+    if (phaseRef.current !== 'listening') return;
+    convo.current = false;
+    await stopRecorder();
+    orbLevel.value = withSpring(0, SPRING.gentle);
+    setPhase('idle');
+  };
+
   const cancel = async () => {
+    convo.current = false;
     runId.current++;
     busy.current = false;
     if (phaseRef.current === 'listening') await stopRecorder();
@@ -347,6 +371,7 @@ export default function AhmedScreen() {
   };
 
   const close = () => {
+    convo.current = false;
     runId.current++;
     leaving.current = true;
     if (handoffTimer.current) clearTimeout(handoffTimer.current);
@@ -516,10 +541,10 @@ export default function AhmedScreen() {
           {phase === 'listening' ? (
             <Animated.View entering={FadeIn.duration(200)} style={{ alignItems: 'center' }}>
               <Txt v="h1" center color={C.ink} style={{ marginTop: 6 }}>
-                Dinləyirəm…
+                {followUp ? 'Davam et…' : 'Dinləyirəm…'}
               </Txt>
               <Txt v="body" center color={C.muted} style={{ marginTop: 8, maxWidth: 300 }}>
-                Məsələn: “Gecə Hilton-a necə gedim?”
+                {followUp ? 'Səni dinləyirəm. Sözünü bitirəndə özüm cavab verəcəm.' : 'Məsələn: “Gecə Hilton-a necə gedim?”'}
               </Txt>
             </Animated.View>
           ) : null}
@@ -595,16 +620,16 @@ export default function AhmedScreen() {
           </Animated.View>
         ) : showDock ? (
           <Animated.View entering={enter(1, 'up')} exiting={FadeOut.duration(120)} style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 14) }]}>
-            {phase === 'listening' ? <ListeningMeter recorder={recorder} level={orbLevel} onLimit={sendRecording} /> : null}
+            {phase === 'listening' ? <ListeningMeter recorder={recorder} level={orbLevel} onLimit={sendRecording} onNoSpeech={noSpeech} /> : null}
             <View style={styles.dockRow}>
               <View style={styles.side}>
                 {phase === 'listening' ? <CircleButton icon="close" size={52} onPress={cancel} label="Ləğv et" bg="#FFFFFF" style={shadow(1)} /> : null}
               </View>
-              <MicButton listening={phase === 'listening'} onPress={phase === 'listening' ? sendRecording : startListening} />
+              <MicButton listening={phase === 'listening'} onPress={phase === 'listening' ? sendRecording : () => startListening()} />
               <View style={styles.side} />
             </View>
             <Txt v="caption" color={C.muted} center>
-              {phase === 'listening' ? 'Bitirəndə toxun' : phase === 'answer' ? 'Yenə soruş' : 'Toxun və danış'}
+              {phase === 'listening' ? 'Danış, susanda özüm göndərəcəm' : phase === 'answer' ? 'Yenə soruş' : 'Toxun və danış'}
             </Txt>
           </Animated.View>
         ) : (

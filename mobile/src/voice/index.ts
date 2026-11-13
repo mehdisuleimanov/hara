@@ -32,8 +32,8 @@ export const VOICE_RECORDING: RecordingOptions = {
   web: { mimeType: 'audio/webm', bitsPerSecond: 32000 },
 } as RecordingOptions;
 
-/** Playback speed for Əhməd's clips (pitch-corrected). */
-const PLAYBACK_RATE = 1.15;
+/** Playback speed for Əhməd's clips (natural pace). */
+const PLAYBACK_RATE = 1;
 
 let player: AudioPlayer | null = null;
 let sub: { remove: () => void } | null = null;
@@ -62,7 +62,8 @@ export function hasClip(text: string) {
 async function cacheFile(key: string) {
   if (Platform.OS === 'web') return null;
   const { Directory, File, Paths } = await import('expo-file-system');
-  const dir = new Directory(Paths.cache, 'voice');
+  // v2: clips synthesized before the plain-text prompt fix are ignored
+  const dir = new Directory(Paths.cache, 'voice-v2');
   if (!dir.exists) dir.create({ intermediates: true });
   return new File(dir, `${key}.wav`);
 }

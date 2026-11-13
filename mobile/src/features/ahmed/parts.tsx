@@ -122,7 +122,24 @@ export function MicButton({ listening, disabled, onPress, size = 84 }: { listeni
 }
 
 /** Reads mic metering (re-renders only itself) → shared level + live waveform + timer. */
-export function ListeningMeter({ recorder, level, onLimit, limitMs = 15000 }: { recorder: AudioRecorder; level: SharedValue<number>; onLimit: () => void; limitMs?: number }) {
+/**
+ * Live input meter + hands-free end-of-speech detection.
+ * Noise floor adapts to the room; after real speech, ~1.2 s of quiet sends the recording (onLimit),
+ * no speech within 7 s calls onNoSpeech.
+ */
+export function ListeningMeter({
+  recorder,
+  level,
+  onLimit,
+  onNoSpeech,
+  limitMs = 15000,
+}: {
+  recorder: AudioRecorder;
+  level: SharedValue<number>;
+  onLimit: () => void;
+  onNoSpeech?: () => void;
+  limitMs?: number;
+}) {
   const st = useAudioRecorderState(recorder, 80);
   const db = st.metering;
   const l = st.isRecording && db != null ? Math.max(0, Math.min(1, (db + 50) / 40)) : 0;
@@ -131,12 +148,36 @@ export function ListeningMeter({ recorder, level, onLimit, limitMs = 15000 }: { 
   }, [l, level]);
   const ms = st.durationMillis ?? 0;
   const fired = useRef(false);
+  const vad = useRef({ floor: 0, speechMs: 0, quietMs: 0, last: 0 });
   useEffect(() => {
-    if (ms >= limitMs && !fired.current) {
+    if (fired.current) return;
+    if (ms >= limitMs) {
       fired.current = true;
       onLimit();
+      return;
     }
-  }, [ms, limitMs, onLimit]);
+    if (!st.isRecording || db == null || db < -95) return;
+    const v = vad.current;
+    const dt = v.last ? Math.min(400, Math.max(0, ms - v.last)) : 0;
+    v.last = ms;
+    // floor: starts at a quiet-room guess, follows quieter readings, drifts up 1.5 dB/s to learn steady noise
+    v.floor = Math.min(db, (v.floor === 0 ? -58 : v.floor) + (1.5 * dt) / 1000);
+    const floor = Math.max(-75, Math.min(-28, v.floor));
+    if (ms < 300) return;
+    if (db > floor + 13) {
+      v.speechMs += dt;
+      v.quietMs = 0;
+    } else if (v.speechMs >= 350 && db < floor + 8) {
+      v.quietMs += dt;
+    }
+    if (v.speechMs >= 350 && v.quietMs >= 1200) {
+      fired.current = true;
+      onLimit();
+    } else if (v.speechMs < 350 && ms >= 7000 && onNoSpeech) {
+      fired.current = true;
+      onNoSpeech();
+    }
+  }, [ms, db, st.isRecording, limitMs, onLimit, onNoSpeech]);
   const s = Math.floor(ms / 1000);
   return (
     <View style={{ alignItems: 'center', gap: 8 }}>

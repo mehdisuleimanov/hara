@@ -33,10 +33,18 @@ const arg = (k: string) => {
 };
 const VOICE = arg('--voice') || env.EXPO_PUBLIC_GEMINI_VOICE || 'Achird';
 const FORCE = args.includes('--force');
-const STYLE = 'Speak quickly and warmly, like a friendly young Baku guide — fast conversational pace, short pauses. Language: North Azerbaijani. Text:';
+// No style instruction: TTS models sometimes read it aloud. The Azerbaijani text alone sets language and pace.
 
 // All keys (free tier quotas are per project): main + GEMINI_API_KEY1..9
 const KEYS = [KEY!, ...Array.from({ length: 9 }, (_, i) => process.env[`GEMINI_API_KEY${i + 1}`] || env[`GEMINI_API_KEY${i + 1}`]).filter(Boolean)] as string[];
+// --keys 1,2,3 → use only these key slots (0 = main), e.g. to leave the app's main key quota untouched
+{
+  const pick = (process.argv.includes('--keys') ? process.argv[process.argv.indexOf('--keys') + 1] : '').split(',').filter(Boolean).map(Number);
+  if (pick.length) {
+    const sel = pick.map((i) => KEYS[i]).filter(Boolean);
+    KEYS.splice(0, KEYS.length, ...sel);
+  }
+}
 const MODELS = [MODEL, 'gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'].filter((m, i, a) => a.indexOf(m) === i);
 const dead = new Set<string>(); // `${key}|${model}` exhausted for today
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -46,7 +54,7 @@ async function ttsOnce(text: string, voice: string, key: string, model: string):
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: `${STYLE} ${text}` }] }],
+      contents: [{ role: 'user', parts: [{ text }] }],
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
     }),
   });
