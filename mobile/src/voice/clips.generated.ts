@@ -8,7 +8,9 @@ export const CLIPS: Record<string, number> = {
   '08ef2118': require('../../assets/voice/08ef2118.wav'), // Bu yeri hələ tanımıram. Ünvanı bir az dəqiq de, ya da yaxınlıqdakı tanınmış yeri
   '0a2e24a2': require('../../assets/voice/0a2e24a2.wav'), // Gənclik Mall üçün ən sərfəli yol pulsuzdur: 3150 metr piyada, 42 dəqiqə. Amma di
   '0da1fc94': require('../../assets/voice/0da1fc94.wav'), // Bir az sola dön.
+  '100c32b5': require('../../assets/voice/100c32b5.wav'), // Dənizkənarında güclü qarşı külək var, daxili küçələrlə gedirik.
   '15c220a2': require('../../assets/voice/15c220a2.wav'), // Düşmə nöqtəsini dəyişdim. İndi giriş elə sənin tərəfindədir.
+  '1ad158f6': require('../../assets/voice/1ad158f6.wav'), // Narahat olma. Ailənə canlı yerini göndərdim.
   '1ce8bdda': require('../../assets/voice/1ce8bdda.wav'), // Alov Qüllələri üçün ən sərfəli yol pulsuzdur: 3910 metr piyada, 51 dəqiqə. Amma 
   '1e1f905c': require('../../assets/voice/1e1f905c.wav'), // Diqqət, taksi səni qarşı tərəfdə düşürəcək. Birbaşa keçmə, səni ən yaxın yeraltı
   '1fed156e': require('../../assets/voice/1fed156e.wav'), // Gecədir, ona görə Bulvar üçün ən az riskli yolu seçdim: metro ilə 2 dayanacaq, s
@@ -20,6 +22,7 @@ export const CLIPS: Record<string, number> = {
   '2992f917': require('../../assets/voice/2992f917.wav'), // Növbəti stansiyada düşürsən.
   '2a9c3543': require('../../assets/voice/2a9c3543.wav'), // Müşayiət sifariş edildi. Əməkdaş səni lift qarşısında gözləyəcək.
   '2f103348': require('../../assets/voice/2f103348.wav'), // Yaxşı, səni evə aparıram. Mən yanındayam.
+  '31225aaa': require('../../assets/voice/31225aaa.wav'), // Nənə evə çatdı. Yolda işıqforsuz keçid olmadı.
   '325178fc': require('../../assets/voice/325178fc.wav'), // Sağ ol! Bildirişin yoldan keçənləri qoruyacaq.
   '35e1731b': require('../../assets/voice/35e1731b.wav'), // Hara gedirsən?
   '3d5e957b': require('../../assets/voice/3d5e957b.wav'), // Hara getmək istədiyini de: məsələn, Hilton, İçərişəhər və ya Gənclik Mall.
@@ -28,6 +31,7 @@ export const CLIPS: Record<string, number> = {
   '451bb781': require('../../assets/voice/451bb781.wav'), // İçərişəhər üçün ən sərfəli yol pulsuzdur: 2780 metr piyada, 37 dəqiqə. Amma diqq
   '48b57723': require('../../assets/voice/48b57723.wav'), // Bir az sağa dön.
   '499d5921': require('../../assets/voice/499d5921.wav'), // Gecədir, ona görə Port Baku üçün ən az riskli yolu seçdim: taksi, təxminən 4 ilə
+  '4cd4ee47': require('../../assets/voice/4cd4ee47.wav'), // Külək zəifdir, dənizkənarı velosiped zolağı ilə gedə bilərik.
   '51213fc4': require('../../assets/voice/51213fc4.wav'), // 80 metr sonra işıqforsuz keçid var. Səni işıqforlu keçidə yönləndirirəm.
   '534bd448': require('../../assets/voice/534bd448.wav'), // Ən qısa yol həmişə ən yaxşısı deyil. Mən işıqforlu keçidi seçirəm.
   '542ed2d5': require('../../assets/voice/542ed2d5.wav'), // Hilton üçün ən az riskli yol: metro ilə 1 dayanacaq, sonra 610 metr piyada, cəmi
@@ -44,6 +48,7 @@ export const CLIPS: Record<string, number> = {
   '7597d9ec': require('../../assets/voice/7597d9ec.wav'), // Təşəkkürlər! Bu keçid Təhlükəsizlik Qatına əlavə olundu.
   '776959a0': require('../../assets/voice/776959a0.wav'), // 80 metr sonra nişansız keçid var. Səni işıqforlu keçidə yönləndirirəm.
   '78aeb6ca': require('../../assets/voice/78aeb6ca.wav'), // Burada avtomobil sıxlığı yüksəkdir və işıqfor yoxdur. Yolu keçərkən diqqətli ol,
+  '7d183dcd': require('../../assets/voice/7d183dcd.wav'), // Bu gün külək çox güclüdür. Skuter əvəzinə metro ilə getməyi məsləhət görürəm.
   '7d72e425': require('../../assets/voice/7d72e425.wav'), // Gecədir, ona görə Alov Qüllələri üçün ən az riskli yolu seçdim: taksi, təxminən 
   '7ddf8ab3': require('../../assets/voice/7ddf8ab3.wav'), // Bu gün külək çox güclüdür, skuter riskli olar. Metro ilə getməyi məsləhət görürə
   '7efd51a6': require('../../assets/voice/7efd51a6.wav'), // Evə ən tez yol taksidir: 22 dəqiqə, təxminən 12 ilə 14 manat arası.
