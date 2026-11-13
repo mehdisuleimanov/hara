@@ -1,109 +1,213 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
-import { BlurView } from 'expo-blur';
+import { Animated, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { SnapMarker } from '@/features/map/SnapMarker';
+import ReAnimated, { FadeIn, FadeInDown, withDelay, withSpring, withTiming } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAppStore, useIsNight } from '@/store/useAppStore';
+import { prefs } from '@/store/prefs';
 import { destById } from '@/data/destinations';
-import { KIND_TITLE, optionsFor, ROUTES } from '@/data/routes';
-import type { RouteKind, RouteOption } from '@/data/types';
-import { scriptedReply } from '@/ai/ahmed';
-import { MAP_STYLE_FOR_TYPE, MAP_TYPE, mapTypeFor, useSatelliteType } from '@/components/mapStyle';
-import { DestPin, OriginPin } from '@/components/RouteLines';
-import { AhmedAvatar } from '@/components/Brand';
+import { optionsFor, ROUTES, summary } from '@/data/routes';
+import type { Destination, LastMeters, LatLng, RouteKind, RouteOption } from '@/data/types';
+import { liveRouteById, type LiveRoute } from '@/features/routing/live';
+import { useMapLook } from '@/components/mapStyle';
+import { speakable } from '@/ai/script';
+import { MeArrow, PinView } from '@/components/RouteLines';
+import { bestOption, cardTitle, RouteCard } from '@/components/RouteCard';
 import { CircleButton, Icon, Txt, tap } from '@/components/ui';
-import { FadeIn } from '@/components/anim';
-import { RiskStrip } from '@/components/charts';
-import { clockPlus, fmtDist, regionFor, toLatLngs } from '@/utils/geo';
-import { speak, stopSpeaking } from '@/utils/tts';
-import { C, R, scoreColor, shadow } from '@/theme';
-
-type Mode = 'walk' | 'accessible' | 'scooter' | 'transit' | 'taxi';
-const MODES: { id: Mode; icon: string; label: string }[] = [
-  { id: 'walk', icon: 'walk', label: 'Piyada' },
-  { id: 'accessible', icon: 'wheelchair-accessibility', label: 'Əlçatan' },
-  { id: 'scooter', icon: 'scooter', label: 'Skuter' },
-  { id: 'transit', icon: 'subway-variant', label: 'Metro və avtobus' },
-  { id: 'taxi', icon: 'taxi', label: 'Taksi' },
-];
-
-function fitsMode(o: RouteOption, m: Mode) {
-  const modes = o.legs.map((l) => l.mode);
-  if (m === 'taxi') return modes.includes('taxi');
-  if (m === 'transit') return modes.includes('metro') || modes.includes('bus');
-  return !modes.includes('taxi'); // walk: everything on foot / public transport
-}
-
-/** Bubble anchor along the route; each option uses a different fraction so labels don't overlap. */
-const BUBBLE_AT: Record<RouteKind, number> = { safest: 0.55, cheapest: 0.3, fastest: 0.8 };
-function bubblePoint(o: RouteOption) {
-  const pts = o.legs.flatMap((l) => toLatLngs(l.c));
-  return pts[Math.min(pts.length - 1, Math.floor(pts.length * BUBBLE_AT[o.kind]))];
-}
+import { Pulse } from '@/components/anim';
+import { Skeleton } from '@/motion/Skeleton';
+import { PressableScale } from '@/motion/PressableScale';
+import { SPRING } from '@/motion/springs';
+import { AhmedAvatar } from '@/components/Brand';
+import { say, stop, useVoice } from '@/voice';
+import { NAV } from '@/voice/lines/nav';
+import { useWeather } from '@/utils/weather';
+import { clockPlus, fmtDist, regionFor } from '@/utils/geo';
+import { RouteLayer } from '@/features/map/RouteLayer';
+import { routePoints, useDrawProgress, useTweenCoord } from '@/features/map/geometry';
+import { Anchored, useMapOverlay } from '@/features/map/overlay';
+import { GlassChip, MapControls, NightVeil } from '@/features/map/MapControls';
+import { LastMetersCard, LastMetersLabel, LastMetersLayer } from '@/features/map/LastMeters';
+import { AhmedExplain } from '@/features/map/AhmedExplain';
+import { C, R, shadow } from '@/theme';
 
 /**
- * Draggable "Directions" sheet: three snap points like Apple/Google Maps.
- *  - full: almost the whole screen      - mid: ~60% (default)
- *  - peek: only the header row (selected route summary + Başla) -> map is free to pan/zoom
+ * Draggable "Directions" sheet with three snap points (Apple/Citymapper style):
+ * full · mid (default) · peek (summary only, map free). A green "Başla" bar floats below.
  */
 type Snap = 'peek' | 'mid' | 'full';
 const SNAPS: Snap[] = ['full', 'mid', 'peek'];
-const PEEK = 80; // handle + header row, above the home indicator
+const PEEK = 78;
+const CTA = 76;
 const ND = Platform.OS !== 'web'; // native driver isn't available on web
-// web preview: a mouse drag on the header must not select (and then drag) the text
 const NO_SELECT = (Platform.OS === 'web' ? { userSelect: 'none' } : null) as any;
-/** Clamp at the top, soft resistance when pulled below the collapsed position. */
 function rubber(v: number, max: number) {
   if (v < 0) return 0;
   return v > max ? max + (v - max) * 0.3 : v;
 }
 
-/** Deterministic per-route risk profile for the strip graphic (prototype data). */
-function riskParts(o: RouteOption, night: boolean) {
-  const s = night ? o.scoreNight : o.scoreDay;
-  const n = 14;
-  const bad = new Set(Array.from({ length: Math.min(4, o.unsignalized) }, (_, k) => Math.floor(((k + 1) * n) / (Math.min(4, o.unsignalized) + 1))));
-  return Array.from({ length: n }, (_, i) => (bad.has(i) ? Math.min(48, s - 10) : Math.max(20, Math.min(98, s + (((i * 37) % 11) - 5)))));
+/** Cards fly in from below with a gentle spring (Əhməd hand-off). */
+function flyIn(delay: number) {
+  if (prefs().liteFx) return FadeIn.duration(160).delay(Math.min(delay, 200));
+  // web preview supports only predefined layout animations
+  if (Platform.OS === 'web') return FadeInDown.duration(420).delay(delay);
+  return (() => {
+    'worklet';
+    return {
+      initialValues: { opacity: 0, transform: [{ translateY: 90 }, { scale: 0.94 }] },
+      animations: {
+        opacity: withDelay(delay, withTiming(1, { duration: 260 })),
+        transform: [{ translateY: withDelay(delay, withSpring(0, SPRING.gentle)) }, { scale: withDelay(delay, withSpring(1, SPRING.gentle)) }],
+      },
+    };
+  }) as any;
+}
+
+function placeAsDest(live: LiveRoute): Destination {
+  return { id: `live:${live.id}`, name: live.place.name, short: live.place.name, district: live.place.district ?? '', icon: 'map-marker-outline', aliases: [], lat: live.place.lat, lon: live.place.lon };
 }
 
 export default function Results() {
-  const { destId, kind, speak: speakParam } = useLocalSearchParams<{ destId: string; kind?: RouteKind; speak?: string }>();
+  const params = useLocalSearchParams<{ destId: string; kind?: RouteKind; speak?: string; from?: string; lm?: string }>();
+  const destId = String(params.destId ?? 'hilton');
+  const isLive = destId.startsWith('live:');
+  const liveId = isLive ? destId.slice(5) : '';
+  const fromAhmed = params.from === 'ahmed' || params.speak === '1';
+
+  // ---- live routes (any place): poll briefly in case the computation is still landing
+  const [live, setLive] = useState<LiveRoute | null>(() => (isLive ? liveRouteById(liveId) ?? liveRouteById(destId) : null));
+  const [liveGaveUp, setLiveGaveUp] = useState(false);
+  useEffect(() => {
+    if (!isLive || live) return;
+    let n = 0;
+    const id = setInterval(() => {
+      const r = liveRouteById(liveId) ?? liveRouteById(destId);
+      if (r) {
+        setLive(r);
+        clearInterval(id);
+      } else if (++n > 20) {
+        setLiveGaveUp(true);
+        clearInterval(id);
+      }
+    }, 350);
+    return () => clearInterval(id);
+  }, [isLive, live, liveId, destId]);
+
+  const dest = isLive ? (live ? placeAsDest(live) : undefined) : destById(destId);
+  const options = useMemo<RouteOption[]>(() => (isLive ? live?.options ?? [] : optionsFor(destId)), [isLive, live, destId]);
+
+  if (isLive && !live && !liveGaveUp) return <ResultsSkeleton />;
+  if (!dest || !options.length) return <ResultsEmpty />;
+  return <ResultsView key={destId} destId={destId} dest={dest} options={options} isLive={isLive} fromAhmed={fromAhmed} kind={params.kind} speak={params.speak} openLm={params.lm === '1'} />;
+}
+
+function ResultsView({
+  destId,
+  dest,
+  options,
+  isLive,
+  fromAhmed,
+  kind,
+  speak,
+  openLm,
+}: {
+  destId: string;
+  dest: Destination;
+  options: RouteOption[];
+  isLive: boolean;
+  fromAhmed: boolean;
+  kind?: RouteKind;
+  speak?: string;
+  openLm: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const { height: H } = useWindowDimensions();
   const night = useIsNight();
-  const wind = useAppStore((s) => s.windSpeed);
   const lastAhmed = useAppStore((s) => s.lastAhmed);
-  const dest = destById(destId);
-  const options = optionsFor(destId);
-  const [selected, setSelected] = useState<RouteKind>(kind ?? 'safest');
-  const [mode, setMode] = useState<Mode>(kind === 'fastest' ? 'taxi' : 'walk');
-  const [avoidDark, setAvoidDark] = useState(true);
+  const showToast = useAppStore((s) => s.showToast);
+  const storeWind = useAppStore((s) => s.windSpeed);
+  const weather = useWeather();
+  const voice = useVoice();
   const mapRef = useRef<MapView>(null);
+  const overlay = useMapOverlay(mapRef);
+
+  const ahmedCtx = lastAhmed && (lastAhmed.destId === destId || (isLive && lastAhmed.liveRouteId && destId === `live:${lastAhmed.liveRouteId}`)) ? lastAhmed : null;
+  // the badge and the "Ən az riskli" title always go to the highest score for NOW (day or night)
+  const best = bestOption(options, night) ?? options[0];
+  const recommended: RouteKind = best.kind;
+  const [selected, setSelected] = useState<RouteKind>(() => {
+    const k = kind ?? best.kind;
+    return options.some((o) => o.kind === k) ? k : options[0].kind;
+  });
+  const opt = options.find((o) => o.kind === selected) ?? options[0];
+  const score = night ? opt.scoreNight : opt.scoreDay;
+  const titleOfOpt = (o: RouteOption) => cardTitle(o, options, night);
+  const lmOption = options.find((o) => o.lastMeters);
+  const lm = lmOption?.lastMeters ?? null;
+
+  const origin: LatLng = useMemo(() => {
+    if (!isLive) return { latitude: ROUTES.origin.lat, longitude: ROUTES.origin.lon };
+    const c = options[0].legs[0]?.c ?? [];
+    return c.length >= 2 ? { latitude: c[0], longitude: c[1] } : { latitude: ROUTES.origin.lat, longitude: ROUTES.origin.lon };
+  }, [isLive, options]);
+  const destLL = useMemo(() => ({ latitude: dest.lat, longitude: dest.lon }), [dest.lat, dest.lon]);
+
+  // Əhməd's own words when he planned this trip; otherwise a sentence built from the same data the
+  // cards show (so the text can never disagree with the "Ən az riskli" badge)
+  const reply = useMemo(() => {
+    if (ahmedCtx?.reply) return ahmedCtx.reply;
+    const how = best.legs.some((l) => l.mode === 'taxi') ? 'taksi' : summary(best).replace(/^./, (c) => c.toLowerCase());
+    const s = night ? best.scoreNight : best.scoreDay;
+    let t = `${dest.name} üçün ${night ? 'bu gecə' : 'indi'} ən az riskli yol: ${how}, ${best.durationMin} dəqiqə, təhlükəsizlik balı ${s}.`;
+    if (best.reasons[0]) t += ` ${best.reasons[0]}.`;
+    if (lm?.wrongSide && lmOption && lmOption.id !== best.id) t += ' Taksi isə səni yolun qarşı tərəfində düşürür.';
+    return t.replace(/\.\./g, '.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ahmedCtx, best.id, night, dest.name]);
+
+  // speak the reply on open (?speak=1); ?speak=0 or absent stays quiet
+  useEffect(() => {
+    if (speak !== '1') return;
+    const t = setTimeout(() => say(speakable(reply)), 650);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => () => stop(), []);
+
+  // ---- "Son 50 metr" view
+  const [lmOpen, setLmOpen] = useState(false);
+  const [lmNonce, setLmNonce] = useState(0);
+  const [moved, setMoved] = useState(false);
+  const look = useMapLook({ night, satellite: lmOpen ? true : undefined });
 
   // ---- draggable sheet geometry (sheet is fullH tall; translateY hides the part below the screen)
   const [boxH, setBoxH] = useState(H);
-  const fullH = Math.max(360, boxH - insets.top - 8);
-  const midVis = Math.min(boxH * 0.6, 540) + insets.bottom;
-  const peekVis = PEEK + insets.bottom;
+  const ctaH = CTA + insets.bottom;
+  const fullH = Math.max(380, boxH - insets.top - 8);
+  const midVis = Math.min(boxH * 0.6, 600);
+  const peekVis = PEEK + ctaH;
   const snapY = useMemo(() => {
     const peek = Math.max(2, fullH - peekVis);
-    return { full: 0, mid: Math.min(Math.max(1, fullH - midVis), peek - 1), peek };
+    return { full: 0, mid: Math.min(Math.max(1, fullH - midVis), peek - 1), peek, hidden: fullH + 40 };
   }, [fullH, midVis, peekVis]);
   const [snap, setSnap] = useState<Snap>('mid');
   const snapRef = useRef<Snap>('mid');
   const snapYRef = useRef(snapY);
   snapYRef.current = snapY;
+  const lmRef = useRef(false);
+  lmRef.current = lmOpen;
   const y = useRef(new Animated.Value(snapY.mid)).current;
-  const enter = useRef(new Animated.Value(240)).current; // slide-in on open
-  const ty = useMemo(() => Animated.add(y, enter), [y, enter]);
+  const enterY = useRef(new Animated.Value(fromAhmed ? 140 : 260)).current;
+  const ty = useMemo(() => Animated.add(y, enterY), [y, enterY]);
   useEffect(() => {
-    Animated.spring(enter, { toValue: 0, tension: 50, friction: 11, useNativeDriver: ND }).start();
-  }, [enter]);
+    Animated.spring(enterY, { toValue: 0, tension: 50, friction: 11, useNativeDriver: ND }).start();
+  }, [enterY]);
   useEffect(() => {
-    y.setValue(snapY[snapRef.current]); // layout changed (rotation / web frame) -> keep the same snap
+    y.setValue(lmRef.current ? snapY.hidden : snapY[snapRef.current]);
   }, [snapY, y]);
-  // header crossfade: "Marşrut" title (mid/full) <-> route summary + Başla (peek)
   const { headOpacity, peekOpacity } = useMemo(() => {
     const half = snapY.mid + (snapY.peek - snapY.mid) * 0.5;
     return {
@@ -112,35 +216,35 @@ export default function Results() {
     };
   }, [y, snapY.mid, snapY.peek]);
 
-  const reply = useMemo(() => {
-    if (lastAhmed && lastAhmed.destId === destId && lastAhmed.reply) return lastAhmed.reply;
-    return scriptedReply(destId, 'safest', night);
-  }, [lastAhmed, destId, night]);
-
-  useEffect(() => {
-    if (speakParam === '1') {
-      const t = setTimeout(() => speak(reply), 500);
-      return () => {
-        clearTimeout(t);
-        stopSpeaking();
-      };
-    }
-  }, [speakParam, reply]);
-
-  const allPts = useMemo(() => options.flatMap((o) => o.legs.flatMap((l) => toLatLngs(l.c))), [options]);
-  const region = useMemo(() => (allPts.length ? regionFor(allPts, 1.25) : undefined), [allPts]);
-  const sat = useSatelliteType(region?.latitudeDelta);
-
-  /** Fit all route lines into the map area that the sheet leaves visible. */
+  // ---- camera
+  const fitPts = useMemo(() => [...routePoints(opt), origin, destLL], [opt, origin, destLL]);
+  // first frame already frames the route (the animated fit then only refines it)
+  const [initialRegion] = useState(() => regionFor(fitPts, 1.6));
   const fitRoute = useCallback(
     (s: Snap) => {
-      if (!allPts.length || s === 'full') return;
-      // mapPadding already reserves the peek height; add the rest of the sheet when it's at mid
+      if (!fitPts.length || s === 'full' || lmRef.current) return;
       const extra = s === 'mid' ? midVis - peekVis : 0;
-      mapRef.current?.fitToCoordinates(allPts, { edgePadding: { top: 24, right: 12, bottom: extra + 28, left: 12 }, animated: true });
+      mapRef.current?.fitToCoordinates(fitPts, { edgePadding: { top: 70, right: 40, bottom: extra + 84, left: 40 }, animated: true });
     },
-    [allPts, midVis, peekVis],
+    [fitPts, midVis, peekVis],
   );
+  const firstFit = useRef(true);
+  const userMoved = useRef(false);
+  // onMapReady is not reliable on the new architecture -> also fit on a timer after mount
+  useEffect(() => {
+    const a = setTimeout(() => !userMoved.current && fitRoute(snapRef.current), 350);
+    const b = setTimeout(() => !userMoved.current && fitRoute(snapRef.current), 1200);
+    const c = setTimeout(overlay.refresh, 1900);
+    return () => [a, b, c].forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (firstFit.current) {
+      firstFit.current = false;
+      return;
+    }
+    fitRoute(snapRef.current);
+  }, [opt.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const settle = (to: Snap, velocity = 0) => {
     const prev = snapRef.current;
@@ -156,7 +260,6 @@ export default function Results() {
   settleRef.current = settle;
   const toggleSheet = () => settle(snapRef.current === 'peek' ? 'mid' : snapRef.current === 'mid' ? 'peek' : 'mid');
 
-  // drag from the handle / header / mode row; taps still reach the buttons (move threshold)
   const dragFrom = useRef(0);
   const pan = useRef(
     PanResponder.create({
@@ -173,43 +276,117 @@ export default function Results() {
   ).current;
   function release(dy: number, vy: number) {
     const ys = snapYRef.current;
-    const projected = rubber(dragFrom.current + dy, ys.peek) + vy * 180; // a flick carries further
+    const projected = rubber(dragFrom.current + dy, ys.peek) + vy * 180;
     let best: Snap = 'mid';
     for (const s of SNAPS) if (Math.abs(ys[s] - projected) < Math.abs(ys[best] - projected)) best = s;
     settleRef.current(best, vy);
   }
 
-  // PERF: LatLng arrays built once per option, not on every render
-  const coords = useMemo(() => Object.fromEntries(options.map((o) => [o.id, o.legs.map((l) => toLatLngs(l.c))])), [options]);
-  const shown = options.filter((o) => fitsMode(o, mode));
-  const list = shown.length ? shown : options;
-  const opt = options.find((o) => o.kind === selected) ?? list[0];
+  // ---- pins: destination drops in (overlay), then the real marker takes over
+  const [landed, setLanded] = useState(Platform.OS === 'web');
+  const [dropping, setDropping] = useState(false);
+  // safety net: the real marker always appears, even if the overlay could not be projected
+  useEffect(() => {
+    const id = setTimeout(() => setLanded(true), 2600);
+    return () => clearTimeout(id);
+  }, []);
 
-  if (!dest || !opt) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg }}>
-        <Txt>Marşrut tapılmadı</Txt>
-      </View>
-    );
-  }
+  // ---- Son 50 metr: the pulsing "N zolaq" label appears once the red line is drawn
+  const [lmLabel, setLmLabel] = useState(false);
+  const lmLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showLabelLater = () => {
+    setLmLabel(false);
+    if (lmLabelTimer.current) clearTimeout(lmLabelTimer.current);
+    lmLabelTimer.current = setTimeout(() => setLmLabel(true), 2050);
+  };
+  useEffect(() => () => {
+    if (lmLabelTimer.current) clearTimeout(lmLabelTimer.current);
+  }, []);
 
-  const pickMode = (m: Mode) => {
+  const openLastMeters = useCallback(() => {
+    if (!lm) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    if (lmOption) setSelected(lmOption.kind);
+    setMoved(false);
+    setLmNonce((n) => n + 1);
+    setLmOpen(true);
+    showLabelLater();
+    Animated.spring(y, { toValue: snapYRef.current.hidden, tension: 60, friction: 12, useNativeDriver: ND }).start();
+    const pts = [...[lm.directC, lm.safeC].flatMap((c) => {
+      const out: LatLng[] = [];
+      for (let i = 0; i + 1 < c.length; i += 2) out.push({ latitude: c[i], longitude: c[i + 1] });
+      return out;
+    }), destLL, { latitude: lm.drop.lat, longitude: lm.drop.lon }];
+    if (lm.betterDrop) pts.push({ latitude: lm.betterDrop.lat, longitude: lm.betterDrop.lon });
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(pts, { edgePadding: { top: insets.top + 90, right: 50, bottom: 450 - peekVis, left: 50 }, animated: true });
+      setTimeout(() => mapRef.current?.animateCamera({ pitch: 32 }, { duration: 900 }), 1100);
+    }, 120);
+    setTimeout(() => say(lm.note || NAV.lastMetersFallback), 900);
+  }, [lm, lmOption, y, destLL, insets.top, peekVis]);
+
+  const closeLastMeters = useCallback(() => {
+    stop();
+    setLmOpen(false);
+    mapRef.current?.animateCamera({ pitch: 0 }, { duration: 300 });
+    snapRef.current = 'mid';
+    setSnap('mid');
+    Animated.spring(y, { toValue: snapYRef.current.mid, tension: 60, friction: 12, useNativeDriver: ND }).start();
+    setTimeout(() => {
+      lmRef.current = false;
+      fitRoute('mid');
+    }, 60);
+  }, [y, fitRoute]);
+
+  const moveDrop = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setMoved(true);
+    say(NAV.dropMoved);
+  };
+  const revertDrop = () => {
     tap();
-    if (m === 'accessible') return router.push('/accessible');
-    if (m === 'scooter') return router.push('/scooter');
-    setMode(m);
-    const first = options.find((o) => fitsMode(o, m));
-    if (first) setSelected(first.kind);
+    showLabelLater();
+    setMoved(false);
+    setLmNonce((n) => n + 1);
   };
-  const go = (k: RouteKind) => {
-    stopSpeaking();
-    router.push(`/navigate?dest=${destId}&kind=${k}`);
+  const sendToDriver = async () => {
+    if (!lm) return;
+    const p = moved && lm.betterDrop ? lm.betterDrop : lm.drop;
+    const label = moved && lm.betterDrop ? lm.betterDrop.label : `${dest.name} · ${lm.street}`;
+    try {
+      await Share.share({ message: `Məni bu nöqtədə düşür: ${label}\nhttps://maps.google.com/?q=${p.lat.toFixed(5)},${p.lon.toFixed(5)}` });
+    } catch {}
+    showToast('Düşmə nöqtəsi sürücüyə göndərildi', 'send-check');
+    if (moved) say(NAV.sentToDriver);
   };
-  const ordered = [...list].sort((a, b) => (a.kind === selected ? -1 : b.kind === selected ? 1 : 0));
+
+  useEffect(() => {
+    if (!openLm || !lm) return;
+    const id = setTimeout(openLastMeters, 900);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const go = () => {
+    stop();
+    router.push(`/navigate?dest=${encodeURIComponent(destId)}&kind=${opt.kind}`);
+  };
+  const playReply = () => {
+    if (voice.speaking) stop();
+    else say(speakable(reply));
+  };
+  const pick = (k: RouteKind) => {
+    if (k !== selected) setSelected(k);
+  };
+
+  const temp = weather?.tempC;
+  const wind = weather?.windSpeed ?? storeWind;
+  // the recommended (highest-scored) option leads; order stays stable while you tap around
+  const ordered = useMemo(() => [...options].sort((a, b) => (a.id === best.id ? -1 : b.id === best.id ? 1 : 0)), [options, best.id]);
 
   return (
     <View
-      style={{ flex: 1, backgroundColor: C.bg }}
+      style={{ flex: 1, backgroundColor: night ? '#17223A' : C.bg }}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (Math.abs(h - boxH) > 1) setBoxH(h);
@@ -219,345 +396,379 @@ export default function Results() {
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFill}
-        mapType={sat.mapType} onRegionChangeComplete={sat.onRegionChangeComplete} customMapStyle={MAP_STYLE_FOR_TYPE}
-        initialRegion={region}
-        onMapReady={() => fitRoute(snapRef.current)}
-        mapPadding={{ top: insets.top + 70, bottom: peekVis, left: 16, right: 70 }}
+        mapType={look.mapType}
+        customMapStyle={look.customMapStyle}
+        initialRegion={initialRegion}
+        onMapReady={() => {
+          // the map may report ready before its first layout pass -> fit again once it has a size
+          fitRoute(snapRef.current);
+          setTimeout(() => {
+            if (!userMoved.current) fitRoute(snapRef.current);
+          }, 450);
+          setTimeout(overlay.refresh, 1100);
+        }}
+        onPanDrag={() => {
+          userMoved.current = true;
+        }}
+        onRegionChange={overlay.onRegionChange}
+        onRegionChangeComplete={overlay.onRegionChangeComplete}
+        mapPadding={{ top: insets.top + 64, bottom: peekVis, left: 8, right: 64 }}
         toolbarEnabled={false}
         showsCompass={false}
-        zoomEnabled
-        scrollEnabled
+        showsBuildings={lmOpen}
         rotateEnabled={false}
       >
-        {/* alternatives: light with white casing */}
-        {options
-          .filter((o) => o.kind !== opt.kind)
-          .flatMap((o) =>
-            o.legs.map((l, i) => (
-              <React.Fragment key={`${o.id}-${i}`}>
-                <Polyline coordinates={coords[o.id][i]} strokeColor="#FFFFFF" strokeWidth={10} lineCap="round" zIndex={3} />
-                <Polyline coordinates={coords[o.id][i]} strokeColor="#9FB0C8" strokeWidth={6} lineCap="round" zIndex={4} />
-              </React.Fragment>
-            )),
-          )}
-        {/* selected: navy with white casing + mint glow */}
-        {opt.legs.map((l, i) => (
-          <React.Fragment key={`sel-${i}`}>
-            <Polyline coordinates={coords[opt.id][i]} strokeColor={C.halo} strokeWidth={20} lineCap="round" zIndex={5} />
-            <Polyline coordinates={coords[opt.id][i]} strokeColor="#FFFFFF" strokeWidth={12} lineCap="round" zIndex={6} />
-            <Polyline
-              coordinates={coords[opt.id][i]}
-              strokeColor={l.mode === 'metro' ? C.metro : C.route}
-              strokeWidth={7}
-              lineCap="round"
-              lineJoin="round"
-              lineDashPattern={l.mode === 'metro' ? [2, 10] : undefined}
-              zIndex={7}
-            />
-          </React.Fragment>
-        ))}
-        {/* time bubbles (reference: "9 min · Your route", "10 min") */}
-        {options.map((o) => {
-          const p = bubblePoint(o);
-          const on = o.kind === opt.kind;
-          return p ? (
-            <Marker key={`${o.id}-${on}`} coordinate={p} anchor={{ x: 0.5, y: 1.15 }} tracksViewChanges={false} onPress={() => setSelected(o.kind)} zIndex={on ? 30 : 20}>
-              <View style={[styles.bubble, on && styles.bubbleOn]}>
-                {on ? <Icon name="shield-check" size={20} color={C.brand} /> : null}
-                <View>
-                  <Txt w="bold" size={15} color={on ? '#fff' : C.route}>
-                    {o.durationMin} dəq
-                  </Txt>
-                  {on ? (
-                    <Txt w="med" size={12} color={C.muted}>
-                      {KIND_TITLE[o.kind]}
-                    </Txt>
-                  ) : null}
-                </View>
-              </View>
-            </Marker>
-          ) : null;
-        })}
-        <OriginPin latitude={ROUTES.origin.lat} longitude={ROUTES.origin.lon} />
-        <DestPin latitude={dest.lat} longitude={dest.lon} icon={dest.icon} />
+        {!lmOpen ? <DrawnRoute options={options} selectedId={opt.id} night={night} dark={look.dark} fromAhmed={fromAhmed} /> : null}
+        <SnapMarker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }} zIndex={30}>
+          <MeArrow size={34} heading={20} />
+        </SnapMarker>
+        {landed ? (
+          <SnapMarker coordinate={destLL} anchor={{ x: 0.5, y: 1 }} zIndex={31}>
+            <PinView icon={dest.icon} color={C.navy} />
+          </SnapMarker>
+        ) : null}
+        {lmOpen && lm ? <DrawnLastMeters key={lmNonce} lm={lm} dest={destLL} moved={moved} /> : null}
       </MapView>
 
-      {/* top-left weather chip (reference "53° AQI 22") */}
-      <View style={[styles.weather, { top: insets.top + 12 }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Icon name={night ? 'weather-night' : 'weather-partly-cloudy'} size={20} />
-          <Txt w="bold" size={20}>
-            11°
-          </Txt>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Txt w="semi" size={12} color={C.ink2}>
-            Külək {wind} m/s
-          </Txt>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: wind > 8 ? C.warn : C.safe }} />
-        </View>
-      </View>
-
-      {/* right controls pill (layers · locate) */}
-      <View style={[styles.sideCtl, { top: insets.top + 12 }]}>
-        <CircleButton icon="layers-outline" size={48} bg="transparent" label="Xəritə qatları" onPress={() => router.navigate('/map')} />
-        <View style={{ height: 1, width: 26, backgroundColor: C.line }} />
-        <CircleButton icon="navigation-variant-outline" size={48} bg="transparent" color={C.route} label="Mənim yerim" />
-      </View>
-
-      {/* glass "Directions" sheet — drag the handle/header up or down (full · mid · peek) */}
-      <Animated.View style={[styles.sheetWrap, { height: fullH, transform: [{ translateY: ty }] }]}>
-      <BlurView intensity={60} tint="light" style={styles.sheet}>
-        <View {...pan.panHandlers} style={NO_SELECT}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={snap === 'peek' ? 'Marşrut panelini aç' : 'Marşrut panelini yığ'}
-          onPress={toggleSheet}
-          hitSlop={{ top: 12, bottom: 4 }}
-          style={styles.handleZone}
-        >
-          <View style={styles.handle} />
-        </Pressable>
-        <View style={styles.sheetHead}>
-          <View style={{ flex: 1, height: 48, justifyContent: 'center' }}>
-            <Animated.View style={{ opacity: headOpacity }} importantForAccessibility={snap === 'peek' ? 'no-hide-descendants' : 'auto'}>
-              <Txt w="black" size={28}>
-                Marşrut
-              </Txt>
-            </Animated.View>
-            {/* collapsed: selected route summary + start, so you can go straight from the map */}
-            <Animated.View
-              style={[StyleSheet.absoluteFill, styles.peekRow, { opacity: peekOpacity, pointerEvents: snap === 'peek' ? 'auto' : 'none' }]}
-              importantForAccessibility={snap === 'peek' ? 'auto' : 'no-hide-descendants'}
-              accessibilityElementsHidden={snap !== 'peek'}
-            >
-              <View style={{ flex: 1 }}>
-                <Txt w="black" size={19} numberOfLines={1}>
-                  {opt.durationMin} dəq · {KIND_TITLE[opt.kind]}
-                </Txt>
-                <Txt w="med" size={13.5} color={C.muted} numberOfLines={1}>
-                  Çatış {clockPlus(opt.durationMin)} · {fmtDist(opt.distanceM)} · {night ? opt.scoreNight : opt.scoreDay} bal
-                </Txt>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${KIND_TITLE[opt.kind]} marşrutla başla`}
-                onPress={() => go(opt.kind)}
-                style={({ pressed }) => [styles.goSmall, { opacity: pressed ? 0.85 : 1 }]}
-              >
-                <Txt w="black" size={16} color="#FFFFFF">
-                  Başla
-                </Txt>
-              </Pressable>
-            </Animated.View>
+      {/* screen overlays pinned to coordinates (native) */}
+      {!lmOpen ? (
+        <Anchored api={overlay} coordinate={origin} anchor={{ x: 0.5, y: 0.5 }}>
+          <View style={{ width: 76, height: 76 }}>
+            <Pulse size={76} color={C.brand} duration={2000} />
           </View>
-          <CircleButton icon="close" size={44} bg={C.bg2} label="Bağla" onPress={() => router.back()} />
-        </View>
+        </Anchored>
+      ) : null}
+      {!landed ? (
+        <Anchored
+          api={overlay}
+          coordinate={destLL}
+          anchor={{ x: 0.5, y: 1 }}
+          onPlaced={() => {
+            setDropping(true);
+            setTimeout(() => setLanded(true), 900);
+          }}
+        >
+          {dropping ? (
+            <ReAnimated.View entering={FadeInDown.springify().damping(9).stiffness(170).withInitialValues({ transform: [{ translateY: -70 }] })}>
+              <PinView icon={dest.icon} color={C.navy} />
+            </ReAnimated.View>
+          ) : (
+            <View style={{ width: 44, height: 53 }} />
+          )}
+        </Anchored>
+      ) : null}
+      {lmOpen && lm && !moved && lmLabel ? <LastMetersLabel api={overlay} lm={lm} visible /> : null}
 
-        {/* mode segmented control */}
-        <View style={styles.segment}>
-          {MODES.map((m) => (
+      <NightVeil night={night} />
+
+      {/* top bar: back · weather/time chip · map controls */}
+      <View style={[styles.top, { top: insets.top + 10 }]} pointerEvents="box-none">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <CircleButton icon="chevron-left" size={44} bg="rgba(255,255,255,0.96)" label="Geri" onPress={() => (lmOpen ? closeLastMeters() : router.back())} style={shadow(1)} />
+          {!lmOpen ? (
+            <ReAnimated.View entering={FadeIn.duration(300).delay(150)}>
+              <GlassChip>
+                <Icon name={night ? 'weather-night' : 'weather-partly-cloudy'} size={18} color={night ? C.ai : C.ink} />
+                <Txt w="bold" size={13.5}>
+                  {night ? 'Gecə' : 'Gündüz'}
+                  {temp != null ? ` · ${temp}°` : ''}
+                </Txt>
+                <View style={{ width: 1, height: 16, backgroundColor: C.line }} />
+                <Icon name="weather-windy" size={16} color={wind > 8 ? C.warn : C.muted} />
+                <Txt w="semi" size={13} color={C.ink2}>
+                  {String(Math.round(wind * 10) / 10).replace('.', ',')} m/s
+                </Txt>
+              </GlassChip>
+            </ReAnimated.View>
+          ) : (
+            <ReAnimated.View entering={FadeIn.duration(260)}>
+              <GlassChip>
+                <Icon name="satellite-variant" size={16} color={C.route} />
+                <Txt w="bold" size={13.5}>
+                  {dest.short} · giriş
+                </Txt>
+              </GlassChip>
+            </ReAnimated.View>
+          )}
+        </View>
+        {!lmOpen ? (
+          <MapControls
+            onLocate={() => {
+              tap();
+              fitRoute(snapRef.current === 'full' ? 'mid' : snapRef.current);
+            }}
+            locateIcon="fit-to-screen-outline"
+          />
+        ) : null}
+      </View>
+
+      {/* glass "Directions" sheet */}
+      <Animated.View style={[styles.sheetWrap, { height: fullH, transform: [{ translateY: ty }] }]} pointerEvents={lmOpen ? 'none' : 'auto'}>
+        <View style={styles.sheet}>
+          <View {...pan.panHandlers} style={NO_SELECT}>
             <Pressable
-              key={m.id}
               accessibilityRole="button"
-              accessibilityLabel={m.label}
-              accessibilityState={{ selected: mode === m.id }}
-              onPress={() => pickMode(m.id)}
-              style={[styles.segItem, mode === m.id && styles.segOn]}
+              accessibilityLabel={snap === 'peek' ? 'Marşrut panelini aç' : 'Marşrut panelini yığ'}
+              onPress={toggleSheet}
+              hitSlop={{ top: 12, bottom: 4 }}
+              style={styles.handleZone}
             >
-              <Icon name={m.icon} size={24} color={mode === m.id ? C.ink : C.ink2} />
+              <View style={styles.handle} />
             </Pressable>
-          ))}
+            <View style={styles.sheetHead}>
+              <View style={{ flex: 1, height: 52, justifyContent: 'center' }}>
+                <Animated.View style={{ opacity: headOpacity }} importantForAccessibility={snap === 'peek' ? 'no-hide-descendants' : 'auto'}>
+                  <Txt w="semi" size={12.5} color={C.muted} numberOfLines={1}>
+                    {isLive ? 'Cari yerdən' : `${ROUTES.origin.name ?? '28 May m.'}-dan`} · {options.length} yol
+                  </Txt>
+                  <Txt v="h1" size={22} lh={28} numberOfLines={1}>
+                    {dest.name}
+                  </Txt>
+                </Animated.View>
+                <Animated.View
+                  style={[StyleSheet.absoluteFill, { justifyContent: 'center', opacity: peekOpacity, pointerEvents: snap === 'peek' ? 'auto' : 'none' }]}
+                  importantForAccessibility={snap === 'peek' ? 'auto' : 'no-hide-descendants'}
+                  accessibilityElementsHidden={snap !== 'peek'}
+                >
+                  <Txt w="black" size={18} numberOfLines={1}>
+                    {opt.durationMin} dəq · {titleOfOpt(opt)}
+                  </Txt>
+                  <Txt w="med" size={13.5} color={C.muted} numberOfLines={1}>
+                    Çatış {clockPlus(opt.durationMin)} · {fmtDist(opt.distanceM)} · {score} bal
+                  </Txt>
+                </Animated.View>
+              </View>
+              <CircleButton icon="close" size={42} bg={C.bg2} label="Bağla" onPress={() => router.back()} />
+            </View>
+          </View>
+
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: ctaH + 24 + (snap === 'full' ? 0 : snapY.mid) }}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={snap !== 'peek'}
+          >
+            <ReAnimated.View entering={fromAhmed ? flyIn(60) : FadeIn.duration(260)}>
+              <AhmedExplain reply={reply} steps={ahmedCtx?.steps} option={opt} speaking={voice.speaking} onPlay={playReply} night={night} />
+            </ReAnimated.View>
+
+            <View style={{ gap: 10, marginTop: 14 }}>
+              {ordered.map((o, i) => (
+                <ReAnimated.View key={o.id} entering={fromAhmed ? flyIn(180 + i * 90) : FadeInDown.duration(300).delay(80 + i * 50)}>
+                  <RouteCard
+                    option={o}
+                    night={night}
+                    selected={o.kind === opt.kind}
+                    recommended={o.kind === recommended}
+                    title={titleOfOpt(o)}
+                    onPress={() => pick(o.kind)}
+                    onLastMeters={o.lastMeters ? openLastMeters : undefined}
+                    ringDelay={fromAhmed ? 380 + i * 90 : 120 + i * 50}
+                  />
+                </ReAnimated.View>
+              ))}
+            </View>
+
+            {lm && lm.wrongSide ? (
+              <ReAnimated.View entering={fromAhmed ? flyIn(180 + options.length * 90 + 60) : FadeInDown.duration(300).delay(260)}>
+                <PressableScale accessibilityRole="button" accessibilityLabel="Son 50 metr" onPress={openLastMeters} style={styles.lmTeaser}>
+                  <View style={styles.lmIcon}>
+                    <Icon name="taxi" size={22} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Txt v="overline" color={C.danger}>
+                      Son 50 metr
+                    </Txt>
+                    <Txt w="bold" size={14.5} style={{ marginTop: 2 }} numberOfLines={2}>
+                      Taksi səni girişin qarşı tərəfində düşürür
+                    </Txt>
+                    <Txt w="semi" size={12.5} color={C.muted} style={{ marginTop: 2 }} numberOfLines={1}>
+                      {lm.street} · {lm.lanes} zolaq · {lm.crossing?.type === 3 ? 'yeraltı keçidlə' : 'işıqforlu keçidlə'} +{Math.max(1, lm.extraMin)} dəq
+                    </Txt>
+                  </View>
+                  <Icon name="chevron-right" size={22} color={C.danger} />
+                </PressableScale>
+              </ReAnimated.View>
+            ) : null}
+
+            {destId === 'hilton' || destId === 'port' ? (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                {destId === 'hilton' ? <LinkChip icon="wheelchair-accessibility" label="Əlçatan yol" onPress={() => router.push('/accessible')} /> : null}
+                {destId === 'port' ? <LinkChip icon="scooter" label="Skuterlə" onPress={() => router.push('/scooter')} /> : null}
+                <LinkChip icon="microphone-outline" label="Əhmədə başqa yer de" onPress={() => router.push('/ahmed')} />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                <LinkChip icon="microphone-outline" label="Əhmədə başqa yer de" onPress={() => router.push('/ahmed')} />
+              </View>
+            )}
+          </ScrollView>
         </View>
-        </View>
-
-        {/* at "mid" the lower part of the sheet is below the screen -> pad so the last card can scroll into view */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 20 + (snap === 'full' ? 0 : snapY.mid) }}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={snap !== 'peek'}
-        >
-          {/* from / to / add stop */}
-          <View style={styles.stops}>
-            <View style={styles.stopRow}>
-              <View style={[styles.stopDot, { backgroundColor: C.route }]}>
-                <Icon name="navigation-variant" size={14} color="#FFFFFF" />
-              </View>
-              <Txt w="med" size={16.5} style={{ flex: 1 }}>
-                Cari yer · 28 May m.
-              </Txt>
-              <Icon name="drag-horizontal-variant" size={22} color={C.faint} />
-            </View>
-            <View style={styles.connector} />
-            <View style={[styles.stopRow, styles.stopBorder]}>
-              <View style={[styles.stopDot, { backgroundColor: C.brand }]}>
-                <Icon name={dest.icon} size={14} color="#FFFFFF" />
-              </View>
-              <Txt w="med" size={16.5} style={{ flex: 1 }}>
-                {dest.name}
-              </Txt>
-              <Icon name="drag-horizontal-variant" size={22} color={C.faint} />
-            </View>
-            <View style={styles.connector} />
-            <Pressable accessibilityRole="button" onPress={() => router.push('/ahmed')} style={[styles.stopRow, styles.stopBorder]}>
-              <View style={[styles.stopDot, { backgroundColor: C.brand }]}>
-                <Icon name="plus" size={16} color="#FFFFFF" />
-              </View>
-              <Txt w="semi" size={16.5} color={C.route} style={{ flex: 1 }}>
-                Dayanacaq əlavə et
-              </Txt>
-              <Icon name="microphone-outline" size={22} color={C.ink2} label="Əhmədə səslə de" />
-              <Icon name="drag-horizontal-variant" size={22} color={C.faint} style={{ marginLeft: 10 }} />
-            </Pressable>
-          </View>
-
-          {/* Now / Avoid chips */}
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-            <View style={styles.chip}>
-              <Txt w="semi" size={15}>
-                {night ? 'İndi · gecə' : 'İndi'}
-              </Txt>
-              <Icon name="chevron-down" size={18} />
-            </View>
-            <Pressable accessibilityRole="button" onPress={() => setAvoidDark((v) => !v)} style={[styles.chip, avoidDark && { backgroundColor: C.brandSoft }]}>
-              <Txt w="semi" size={15}>
-                {avoidDark ? 'Qaç: işıqsız küçə' : 'Qaç'}
-              </Txt>
-              <Icon name="chevron-down" size={18} />
-            </Pressable>
-          </View>
-
-          {/* route cards (reference: "9 min · 9:50 ETA · 1.8 mi · GO") */}
-          <View style={{ gap: 10, marginTop: 14 }}>
-            {ordered.map((o, idx) => {
-              const s = night ? o.scoreNight : o.scoreDay;
-              const on = o.kind === opt.kind;
-              return (
-                <FadeIn key={o.id} index={idx} delay={250}>
-                <View style={[styles.card, on && styles.cardOn]}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    onPress={() => {
-                      tap();
-                      setSelected(o.kind);
-                    }}
-                    style={{ flex: 1 }}
-                  >
-                    <Txt w="black" size={24}>
-                      {o.durationMin} dəq
-                    </Txt>
-                    <Txt w="med" size={14.5} color={C.muted} style={{ marginTop: 2 }}>
-                      Çatış {clockPlus(o.durationMin)} · {fmtDist(o.distanceM)} · {o.price}
-                    </Txt>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                      <Icon name={o.warning ? 'alert-outline' : 'shield-check-outline'} size={17} color={o.warning ? C.danger : scoreColor(s)} />
-                      <Txt w="semi" size={13.5} color={o.warning ? C.danger : C.ink2} numberOfLines={1} style={{ flexShrink: 1 }}>
-                        {o.warning ?? `${KIND_TITLE[o.kind]} yol`} · {s} bal
-                      </Txt>
-                    </View>
-                    <View style={{ marginTop: 10 }}>
-                      <RiskStrip parts={riskParts(o, night)} />
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${KIND_TITLE[o.kind]} marşrutla başla`}
-                    onPress={() => go(o.kind)}
-                    style={({ pressed }) => [styles.go, { opacity: pressed ? 0.85 : 1 }]}
-                  >
-                    <Txt w="black" size={17} color="#FFFFFF">
-                      Başla
-                    </Txt>
-                  </Pressable>
-                </View>
-                </FadeIn>
-              );
-            })}
-          </View>
-
-          {/* Əhməd's explanation */}
-          <Pressable accessibilityRole="button" onPress={() => speak(reply)} style={styles.ahmed}>
-            <View style={styles.ahmedArt}>
-              <AhmedAvatar size={34} />
-            </View>
-            <Txt w="med" size={13.5} color={C.ink2} style={{ flex: 1 }} numberOfLines={3}>
-              {reply}
-            </Txt>
-            <Icon name="volume-high" size={20} label="Səsli oxu" />
-          </Pressable>
-        </ScrollView>
-      </BlurView>
       </Animated.View>
+
+      {/* floating start bar */}
+      {!lmOpen ? (
+        <ReAnimated.View entering={FadeInDown.springify().damping(18).delay(fromAhmed ? 520 : 200)} style={[styles.ctaBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <PressableScale accessibilityRole="button" accessibilityLabel={`${titleOfOpt(opt)} yolla başla`} haptic="medium" scaleTo={0.97} onPress={go} style={styles.cta}>
+            <View style={styles.ctaIcon}>
+              <Icon name="navigation-variant" size={22} color={C.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Txt w="black" size={17} color="#FFFFFF">
+                Başla
+              </Txt>
+              <Txt w="semi" size={12.5} color="rgba(255,255,255,0.85)" numberOfLines={1}>
+                {titleOfOpt(opt)} · {opt.durationMin} dəq · çatış {clockPlus(opt.durationMin)}
+              </Txt>
+            </View>
+            <View style={styles.ctaScore}>
+              <Icon name="shield-check" size={15} color="#FFFFFF" />
+              <Txt w="bold" size={14} color="#FFFFFF">
+                {score}
+              </Txt>
+            </View>
+          </PressableScale>
+        </ReAnimated.View>
+      ) : null}
+
+      {lmOpen && lm ? (
+        <LastMetersCard
+          lm={lm}
+          moved={moved}
+          speaking={voice.speaking}
+          bottomInset={insets.bottom}
+          onMove={moveDrop}
+          onRevert={revertDrop}
+          onSend={sendToDriver}
+          onSpeak={() => (voice.speaking ? stop() : say(moved ? NAV.dropMoved : lm.note || NAV.lastMetersFallback))}
+          onClose={closeLastMeters}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/** Owns the ~30 fps draw progress so only the map layer re-renders while the line traces. */
+function DrawnRoute({ options, selectedId, night, dark, fromAhmed }: { options: RouteOption[]; selectedId: string; night: boolean; dark: boolean; fromAhmed: boolean }) {
+  const t = useDrawProgress(`${selectedId}|${night ? 'n' : 'd'}`, { duration: fromAhmed ? 1300 : 1000, delay: fromAhmed ? 420 : 220 });
+  return <RouteLayer options={options} selectedId={selectedId} t={t} night={night} dark={dark} />;
+}
+
+/** Son 50 metr map layer: red line first, then the safe walk; the taxi pin springs when moved. */
+function DrawnLastMeters({ lm, dest, moved }: { lm: LastMeters; dest: LatLng; moved: boolean }) {
+  const tRed = useDrawProgress('lmr', { duration: 900, delay: 1100 });
+  const tGreen = useDrawProgress('lmg', { duration: 1300, delay: 2100 });
+  const target = useMemo<LatLng>(() => {
+    const p = moved && lm.betterDrop ? lm.betterDrop : lm.drop;
+    return { latitude: p.lat, longitude: p.lon };
+  }, [lm, moved]);
+  const drop = useTweenCoord(target, 800);
+  if (!drop) return null;
+  return <LastMetersLayer lm={lm} drop={drop} dest={dest} tRed={tRed} tGreen={tGreen} moved={moved} />;
+}
+
+function LinkChip({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
+  return (
+    <PressableScale accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.link}>
+      <Icon name={icon} size={17} color={C.route} />
+      <Txt w="semi" size={13} color={C.ink} numberOfLines={1}>
+        {label}
+      </Txt>
+    </PressableScale>
+  );
+}
+
+/** Live route still landing: calm skeleton (never a spinner or an error). */
+function ResultsSkeleton() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flex: 1, backgroundColor: C.surface }}>
+      <View style={{ flex: 1 }} />
+      <View style={[styles.skelSheet, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={[styles.handle, { alignSelf: 'center', marginBottom: 16 }]} />
+        <Skeleton width={120} height={12} />
+        <Skeleton width={220} height={24} style={{ marginTop: 8 }} />
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 18 }}>
+          <AhmedAvatar size={34} />
+          <Txt w="semi" size={14} color={C.ai}>
+            Əhməd yolları yoxlayır…
+          </Txt>
+        </View>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} height={84} radius={R.lg} style={{ marginTop: 12 }} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** No route for this place: Əhməd offers to try again (no error wording). */
+function ResultsEmpty() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 28, paddingBottom: insets.bottom + 28 }}>
+      <ReAnimated.View entering={FadeInDown.springify().damping(16)} style={{ alignItems: 'center' }}>
+        <AhmedAvatar size={96} full />
+        <Txt v="h2" center style={{ marginTop: 18 }}>
+          Bu yeri hələ tanımıram
+        </Txt>
+        <Txt w="med" size={15} color={C.muted} center style={{ marginTop: 8, maxWidth: 300 }}>
+          Ünvanı bir az dəqiq de, ya da yaxınlıqdakı tanınmış yeri söylə — yolu dərhal hesablayım.
+        </Txt>
+        <PressableScale accessibilityRole="button" haptic="medium" onPress={() => router.replace('/ahmed')} style={[styles.cta, { marginTop: 22, paddingHorizontal: 22, alignSelf: 'center' }]}>
+          <Icon name="microphone" size={20} color="#FFFFFF" />
+          <Txt w="bold" size={16} color="#FFFFFF">
+            Əhmədə de
+          </Txt>
+        </PressableScale>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} style={{ marginTop: 14, padding: 8 }}>
+          <Txt w="semi" size={14.5} color={C.route}>
+            Geri qayıt
+          </Txt>
+        </Pressable>
+      </ReAnimated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    ...shadow(2),
-  },
-  bubbleOn: { backgroundColor: C.route },
-  weather: {
-    position: 'absolute',
-    left: 16,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    ...shadow(1),
-  },
-  sideCtl: {
-    position: 'absolute',
-    right: 14,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 26,
-    paddingVertical: 4,
-    ...shadow(2),
-  },
+  top: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   sheetWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     ...shadow(3),
   },
   sheet: {
     flex: 1,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: C.bg,
     paddingHorizontal: 16,
   },
-  handleZone: { alignSelf: 'stretch', alignItems: 'center', paddingTop: 8, paddingBottom: 8 },
+  handleZone: { alignSelf: 'stretch', alignItems: 'center', paddingTop: 8, paddingBottom: 6 },
   handle: { width: 40, height: 5, borderRadius: 3, backgroundColor: C.faint },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 },
-  peekRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  goSmall: { height: 48, paddingHorizontal: 20, borderRadius: R.pill, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
-  segment: { flexDirection: 'row', backgroundColor: 'rgba(15,27,45,0.05)', borderRadius: R.pill, padding: 4, marginBottom: 12 },
-  segItem: { flex: 1, height: 48, borderRadius: R.pill, alignItems: 'center', justifyContent: 'center' },
-  segOn: { backgroundColor: '#FFFFFF', ...shadow(1) },
-  stops: { backgroundColor: 'rgba(15,27,45,0.05)', borderRadius: 20, paddingHorizontal: 14 },
-  stopRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54 },
-  stopBorder: { borderTopWidth: 1, borderTopColor: 'rgba(15,27,45,0.05)' },
-  stopDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  connector: { position: 'absolute', left: 26, width: 2, height: 0 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(15,27,45,0.05)', borderRadius: R.pill, paddingHorizontal: 16, height: 44 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 22, padding: 16, borderWidth: 2, borderColor: 'transparent' },
-  cardOn: { borderColor: C.brand },
-  go: { width: 76, height: 64, borderRadius: 16, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' },
-  ahmed: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface, borderRadius: 20, padding: 12, marginTop: 10 },
-  ahmedArt: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  lmTeaser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: R.lg,
+    backgroundColor: '#FFF4F4',
+    borderWidth: 1.5,
+    borderColor: 'rgba(229,72,77,0.25)',
+  },
+  lmIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.danger, alignItems: 'center', justifyContent: 'center' },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: C.surface, flexShrink: 1 },
+  ctaBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 8, backgroundColor: 'rgba(255,255,255,0.97)', borderTopWidth: 1, borderTopColor: C.line },
+  cta: { height: 60, borderRadius: R.pill, backgroundColor: C.brand, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 7, paddingRight: 10, ...shadow(2) },
+  ctaIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  ctaScore: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.22)' },
+  skelSheet: { backgroundColor: C.bg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 18, ...shadow(3) },
 });

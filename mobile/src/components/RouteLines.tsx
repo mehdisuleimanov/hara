@@ -2,43 +2,27 @@ import React, { memo } from 'react';
 import { View } from 'react-native';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 import { Marker, Polyline } from 'react-native-maps';
+import { SnapMarker } from '@/features/map/SnapMarker';
 import type { RouteOption } from '@/data/types';
 import { toLatLngs } from '@/utils/geo';
 import { C } from '@/theme';
 import { Icon, Txt } from './ui';
+import { LegPolyline } from '@/features/map/LegPolyline';
 
-const LEG_COLOR: Record<string, string> = {
-  walk: C.route,
-  metro: C.metro,
-  bus: C.bus,
-  taxi: '#5B6478',
-  scooter: C.route,
-  bike: C.route,
-};
-
+/** Whole route, per-leg styling (metro legs underground). Thin wrapper over LegPolyline. */
 export const RouteLines = memo(function RouteLines({ option, active }: { option: RouteOption; active: boolean }) {
   return (
     <>
-      {option.legs.map((leg, i) => {
-        const coords = toLatLngs(leg.c);
-        if (!active) {
-          return <Polyline key={i} coordinates={coords} strokeColor="#9AA1B2" strokeWidth={4} lineDashPattern={[8, 8]} zIndex={6} />;
-        }
-        return (
+      {option.legs.map((leg, i) =>
+        active ? (
           <React.Fragment key={i}>
-            <Polyline coordinates={coords} strokeColor={C.halo} strokeWidth={16} zIndex={7} lineCap="round" />
-            <Polyline
-              coordinates={coords}
-              strokeColor={LEG_COLOR[leg.mode]}
-              strokeWidth={6}
-              lineCap="round"
-              lineJoin="round"
-              lineDashPattern={leg.mode === 'metro' ? [2, 10] : undefined}
-              zIndex={8}
-            />
+            {leg.mode !== 'metro' ? <Polyline coordinates={toLatLngs(leg.c)} strokeColor={C.routeGlow} strokeWidth={20} lineCap="round" zIndex={4} /> : null}
+            <LegPolyline leg={leg} state="active" zIndex={6} />
           </React.Fragment>
-        );
-      })}
+        ) : (
+          <LegPolyline key={i} leg={leg} state="inactive" zIndex={2} />
+        ),
+      )}
     </>
   );
 });
@@ -129,17 +113,17 @@ export function MeArrow({ size = 56, heading = 0, halo = true }: { size?: number
 
 export function OriginPin({ latitude, longitude, heading = 20 }: { latitude: number; longitude: number; heading?: number }) {
   return (
-    <Marker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={20}>
+    <SnapMarker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 0.5 }} zIndex={20}>
       <MeArrow size={34} heading={heading} />
-    </Marker>
+    </SnapMarker>
   );
 }
 
 export function DestPin({ latitude, longitude, icon = 'flag-checkered' }: { latitude: number; longitude: number; icon?: string }) {
   return (
-    <Marker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} zIndex={21}>
+    <SnapMarker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} zIndex={21}>
       <PinView icon={icon} />
-    </Marker>
+    </SnapMarker>
   );
 }
 
@@ -164,10 +148,10 @@ export function IconPin({
 }) {
   // bg is the semantic tone (danger / warn) -> used for the icon; the pin itself stays navy
   return (
-    <Marker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false} onPress={onPress} zIndex={15}>
+    <SnapMarker coordinate={{ latitude, longitude }} anchor={{ x: 0.5, y: 1 }} onPress={onPress} zIndex={15}>
       <View style={{ padding: 6 }}>
         <PinView icon={icon} iconColor={bg && bg !== '#fff' && bg !== '#FFFFFF' ? bg : color ?? C.ink} size={size} badge={badge} />
       </View>
-    </Marker>
+    </SnapMarker>
   );
 }
