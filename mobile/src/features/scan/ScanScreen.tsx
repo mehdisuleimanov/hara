@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Ahmed } from '@/features/mascot';
 import { Linking, Platform, StyleSheet, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -342,7 +343,7 @@ function CapturePane({
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Glow size={200} color={C.ai} intensity={0.5} />
             <Animated.View entering={enter(0, 'pop')}>
-              <AhmedAvatar size={104} full />
+              <Ahmed size={112} pose="scan" prop="magnifier" glow />
             </Animated.View>
           </View>
           <Animated.View entering={enter(1, 'up')} style={{ alignItems: 'center', gap: 8 }}>

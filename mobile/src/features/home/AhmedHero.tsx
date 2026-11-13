@@ -1,4 +1,5 @@
 import React from 'react';
+import { Ahmed } from '@/features/mascot';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,7 +41,7 @@ export function AhmedHero({ line }: { line: string }) {
           >
             <Glow size={190} color={C.ai} intensity={0.38} style={{ left: -40, top: -36 }} />
             <Float amplitude={4}>
-              <AhmedAvatar size={104} full glow={false} mood={talking ? 'talk' : 'smile'} />
+              <Ahmed size={112} pose={talking ? 'talk' : 'idle'} speaking={talking} glow={false} prop={new Date().getHours() >= 19 || new Date().getHours() < 6 ? 'flashlight' : 'none'} />
             </Float>
           </PressableScale>
           <PressableScale scaleTo={0.98} accessibilityRole="button" accessibilityLabel={line} accessibilityHint="Səsli oxu" onPress={() => say(line)} style={styles.bubble}>

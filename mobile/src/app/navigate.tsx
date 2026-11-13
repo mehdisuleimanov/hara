@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Ahmed, AhmedWalker } from '@/features/mascot';
 import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SnapMarker } from '@/features/map/SnapMarker';
@@ -605,6 +606,10 @@ export default function Navigate() {
             <Txt w="semi" size={13.5} color={C.muted}>
               {fmtDist(remainingM)} · çatış {clockPlus(remMin)} · {score} bal
             </Txt>
+            <View style={{ width: 190, height: 40, marginTop: 4 }}>
+              <View style={{ position: 'absolute', left: 0, right: 0, bottom: 4, height: 4, borderRadius: 2, backgroundColor: C.bg2 }} />
+              <AhmedWalker progress={Math.max(0, Math.min(1, dist / Math.max(1, plan.track.total)))} width={190} size={36} />
+            </View>
           </View>
           <PressableScale
             accessibilityRole="button"
@@ -686,11 +691,7 @@ function Arrival({ destName, avoided, from, to, night, onDone, bottom }: { destN
       <Animated.View entering={FadeInUp.springify().damping(15).stiffness(150)} style={[styles.arrive, { marginBottom: bottom + 16 }]}>
         <View style={{ alignItems: 'center', justifyContent: 'center', height: 120 }}>
           <Burst size={240} count={16} />
-          <Pop>
-            <View style={styles.arriveBadge}>
-              <Icon name="flag-checkered" size={40} color="#FFFFFF" />
-            </View>
-          </Pop>
+          <Ahmed size={124} pose="celebrate" glow />
         </View>
         <Txt v="hero" center>
           Çatdın!

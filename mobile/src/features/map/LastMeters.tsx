@@ -1,4 +1,5 @@
 import React, { memo, useMemo } from 'react';
+import { Ahmed } from '@/features/mascot';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Marker, Polyline } from 'react-native-maps';
 import { SnapMarker } from './SnapMarker';
@@ -192,7 +193,7 @@ export function LastMetersCard({
 
       <PressableScale accessibilityRole="button" accessibilityLabel="Əhmədi dinlə" onPress={onSpeak} style={styles.ahmed}>
         <View style={styles.ahmedArt}>
-          <AhmedAvatar size={30} mood={speaking ? 'talk' : 'smile'} />
+          <Ahmed size={46} crop="bust" pose={speaking ? 'talk' : 'stop'} speaking={speaking} glow={false} />
         </View>
         <Txt w="med" size={13.5} color={C.ink2} style={{ flex: 1 }} numberOfLines={4}>
           {moved ? NAV.dropMoved : lm.note || NAV.lastMetersFallback}

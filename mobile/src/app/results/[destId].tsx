@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Ahmed } from '@/features/mascot';
 import { Animated, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SnapMarker } from '@/features/map/SnapMarker';
@@ -708,7 +709,7 @@ function ResultsEmpty() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 28, paddingBottom: insets.bottom + 28 }}>
       <ReAnimated.View entering={FadeInDown.springify().damping(16)} style={{ alignItems: 'center' }}>
-        <AhmedAvatar size={96} full />
+        <Ahmed size={104} pose="confused" glow interactive />
         <Txt v="h2" center style={{ marginTop: 18 }}>
           Bu yeri hələ tanımıram
         </Txt>

@@ -1,3 +1,5 @@
+import { Ahmed, AhmedArt, AhmedHead, type AhmedPose } from '@/features/mascot';
+import { CROPS as MASCOT_CROPS } from '@/features/mascot/art';
 import React, { memo, useEffect, useMemo } from 'react';
 import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
@@ -269,38 +271,28 @@ export const AhmedAvatar = memo(function AhmedAvatar({
   bob?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const vb = full ? VB_FULL : VB_HEAD;
-  const box = parseVb(vb);
+  // Same footprint as before; rendered by the rigged mascot (features/mascot).
+  void bob;
+  const box = parseVb(full ? VB_FULL : VB_HEAD);
   const w = size;
   const h = (size * box.h) / box.w;
-  const k = size / box.w;
-  const doBlink = blink ?? size >= 40;
-  const doBob = !!bob && size >= 40;
-  const m: Mood = mood;
-
-  const head = useMemo(() => mascotHead(m, { withMouth: !speaking, withEyes: !doBlink }), [m, speaking, doBlink]);
-  const eyes = useMemo(() => mascotEyes(m), [m]);
-  const eyeY = (PIVOT.eyes.y - box.y) * k;
-  const mouthY = (PIVOT.mouth.y - box.y) * k;
-
-  const content = (
-    <>
-      {full || glow ? <Layer shapes={full ? [...(glow ? GLOW : []), ...BACK] : GLOW} vb={vb} w={w} h={h} /> : null}
-      <Layer shapes={head} vb={vb} w={w} h={h} body />
-      {doBlink ? <BlinkEyes shapes={eyes} vb={vb} w={w} h={h} eyeY={eyeY} enabled={!reduceMotion} /> : null}
-      {speaking ? <TalkMouth vb={vb} w={w} h={h} mouthY={mouthY} /> : null}
-    </>
-  );
-
-  const boxStyle: StyleProp<ViewStyle> = [{ width: w, height: h }, style];
+  const crop = full ? MASCOT_CROPS.full : MASCOT_CROPS.head;
+  const ch = Math.min(h, (w * crop[3]) / crop[2]);
+  const still = blink === false || size < 30;
+  const pose: AhmedPose =
+    speaking || mood === 'talk' ? 'talk' : mood === 'think' ? 'think' : mood === 'alert' ? 'alert' : mood === 'wave' ? 'wave' : 'idle';
   return (
-    <View accessible accessibilityRole="image" accessibilityLabel="Əhməd" style={boxStyle}>
-      {doBob ? (
-        <Bob amp={size * 0.035} style={{ width: w, height: h }}>
-          {content}
-        </Bob>
+    <View accessible accessibilityRole="image" accessibilityLabel="Əhməd" style={[{ width: w, height: h, alignItems: 'center', justifyContent: full ? 'flex-end' : 'center' }, style]}>
+      {full ? (
+        still ? (
+          <AhmedArt size={ch} pose={pose} glow={glow} />
+        ) : (
+          <Ahmed size={ch} pose={pose} speaking={speaking} glow={glow} />
+        )
+      ) : still ? (
+        <AhmedArt size={ch} crop="head" pose={pose} glow={false} />
       ) : (
-        content
+        <AhmedHead size={ch} mood={mood} speaking={speaking} />
       )}
     </View>
   );
