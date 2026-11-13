@@ -94,7 +94,7 @@ export const KEY_POSES: Record<string, PoseP> = {
     body: { rot: 5, sx: 1.015, sy: 1.015 },
     look: [0.35, -0.1],
     brow: { ly: -2.5, ry: -3, rr: -4 },
-    mouth: { smile: 0.6, o: 0.45 },
+    mouth: { smile: 0, o: 0.62 },
     armR: { sh: 150, el: 21, wr: -30, hand: 'mitten' },
   }),
   walk: make({

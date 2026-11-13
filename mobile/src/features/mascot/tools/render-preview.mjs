@@ -206,3 +206,14 @@ if (what === 'all' || what === 'variants') {
   opts.forEach(([gl, t], i) => (inner += cell(i * cw + 10, 10, cw - 20, ch - 20, FULL, character(K.wave, { glow: gl })) + label(i * cw + cw / 2, ch + 20, t)));
   png('ahmed-variants-glow.png', svgDoc(cw * opts.length, ch + 36, inner));
 }
+// transparent brand exports (app icon / store art): node ... render-preview.mjs <mobile> <mobile>/assets/brand brand
+if (what === 'brand') {
+  const write = (name, w, h, crop, inner) => {
+    const svg = svgDoc(w, h, cell(0, 0, w, h, crop, inner, true), null);
+    writeFileSync(path.join(outDir, name + '.svg'), svg);
+    png(name + '.png', svg);
+  };
+  const HC = A.CROPS.head;
+  write('ahmed-full', Math.round((1024 * FULL[2]) / FULL[3]), 1024, FULL, character(K.wave, { glow: 0 }));
+  write('ahmed-head', Math.round((512 * HC[2]) / HC[3]), 512, HC, character(K.idle, { glow: 0, limbs: false }));
+}

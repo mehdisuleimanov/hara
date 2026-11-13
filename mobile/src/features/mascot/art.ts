@@ -429,7 +429,7 @@ export function beam(): Art {
   const y0 = w.y + 22;
   return {
     box: [w.x - 26, y0, 52, 58],
-    defs: [{ k: 'lin', id: 'beam', x1: 0, y1: 0, x2: 0, y2: 1, stops: [[0, COL.beam, 0.85], [0.5, COL.beam, 0.35], [1, COL.beam, 0]] }],
+    defs: [{ k: 'lin', id: 'beam', x1: 0, y1: 0, x2: 0, y2: 1, stops: [[0, '#FFE58A', 1], [0.45, COL.beam, 0.6], [1, COL.beam, 0]] }],
     shapes: [{ k: 'path', d: `M${w.x - 4.6} ${y0}L${w.x - 24} ${y0 + 56}Q${w.x} ${y0 + 62} ${w.x + 24} ${y0 + 56}L${w.x + 4.6} ${y0}Z`, fill: 'url(#beam)' }],
   };
 }

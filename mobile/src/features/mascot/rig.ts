@@ -397,6 +397,11 @@ export function step(st: RigState, inp: RigInput, nowS: number, dt: number, leve
     for (let k = 0; k < N; k++) tmp[k] = b[k];
     if (!lite) animatePose(i, tmp, t - st.start[i], t, inp);
     else if (i === 8) animatePose(i, tmp, 0, 0, inp); // point direction still applies
+    else if (i === 6) {
+      // lite celebrate: grounded, arms up, no jump/cap flight
+      tmp[ROOT_Y] = 0; tmp[ROOT_SX] = 1; tmp[ROOT_SY] = 1; tmp[CAP_Y] = 0; tmp[CAP_R] = 0; tmp[CAP_X] = 0;
+      tmp[LL] = 0; tmp[LR] = 0; tmp[LL + 1] = 0; tmp[LR + 1] = 0;
+    }
     for (let k = 0; k < N; k++) v[k] += w * tmp[k];
     wsum += w;
   }
